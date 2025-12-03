@@ -29,7 +29,7 @@ class NMAC(BasicMAC): # 负责批量为所有环境中的所有 agent 选择动�
         # Explore mode with parallel runners (batch_size_run * n_agents, e) -> (batch_size_run, n_agents, e)
         b, e = agent_inputs.size()
         agent_inputs = agent_inputs.view(ep_batch.batch_size, b // ep_batch.batch_size, e)
-        avail_actions = ep_batch["avail_actions"][:, t]
+        # avail_actions = ep_batch["avail_actions"][:, t]
         agent_outs, self.hidden_states = self.agent(agent_inputs, self.hidden_states)
 
         return agent_outs # (batch_size, n_agents, n_actions)

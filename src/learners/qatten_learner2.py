@@ -48,7 +48,7 @@ class QattenLearner2:
     def train(self, batch: EpisodeBatch, t_env: int, episode_num: int, per_weight=None):
         # Get the relevant quantities
 
-        rewards = batch["reward"][:, :-1].to(th.float32)
+        rewards = batch["reward"][:, :-1].to(th.float32) # (batch_size, seq_len-1, n_agents)
         actions = batch["actions"][:, :-1].to(th.long)
         terminated = batch["terminated"][:, :-1].float()
         mask = batch["filled"][:, :-1].float()
@@ -67,7 +67,6 @@ class QattenLearner2:
 
         # print("mac_out[:, :-1].shape:", mac_out[:, :-1].shape)
         # print("actions.shape:", actions.shape)
-        # mac_out[:, :-1].shape: torch.Size([8, 150, 288, 23])
         # actions.shape: torch.Size([128, 150, 18, 1])
 
 

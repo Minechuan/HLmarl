@@ -46,8 +46,10 @@ class QattenMixer(nn.Module):
     def forward(self, agent_qs, states):
         bs = agent_qs.size(0)
         states = states.reshape(-1, self.state_dim)
-        us = self._get_us(states)
-        agent_qs = agent_qs.view(-1, 1, self.n_agents)
+
+        # state shape: [B, state_dim]
+        us = self._get_us(states) # shape: [B, n_agents, state_dim_per_agent]
+        agent_qs = agent_qs.view(-1, 1, self.n_agents) # shape: [B, 1, n_agents]
 
         q_lambda_list = []
         for i in range(self.n_attention_head):
@@ -58,21 +60,21 @@ class QattenMixer(nn.Module):
             state_embedding = state_embedding.reshape(-1, 1, self.n_query_embedding_layer2)
             # shape: [-1, state_dim, n_agent]
             u_embedding = u_embedding.reshape(-1, self.n_agents, self.n_key_embedding_layer1)
-            u_embedding = u_embedding.permute(0, 2, 1)
+            u_embedding = u_embedding.permute(0, 2, 1) # shape: [B, n_key_embedding_layer1, n_agent]
 
-            # shape: [-1, 1, n_agent]
+            
             raw_lambda = th.matmul(state_embedding, u_embedding) / self.scaled_product_value
-            q_lambda = F.softmax(raw_lambda, dim=-1)
+            q_lambda = F.softmax(raw_lambda, dim=-1) # shape: [B, 1, n_agent]
 
             q_lambda_list.append(q_lambda)
 
-        # shape: [-1, n_attention_head, n_agent]
+        # shape: [H, B, 1, n_agent]
         q_lambda_list = th.stack(q_lambda_list, dim=1).squeeze(-2)
 
-        # shape: [-1, n_agent, n_attention_head]
+        # shape: [B,H, n_agent]
         q_lambda_list = q_lambda_list.permute(0, 2, 1)
 
-        # shape: [-1, 1, n_attention_head]
+        # shape: [B, n_agent, H]
         q_h = th.matmul(agent_qs, q_lambda_list)
 
         if self.args.type == 'weighted':
@@ -94,6 +96,7 @@ class QattenMixer(nn.Module):
         return q_tot
 
     def _get_us(self, states):
+        # get unit states
         agent_own_state_size = self.args.agent_own_state_size
         with th.no_grad():
             us = states[:, :agent_own_state_size*self.n_agents].reshape(-1, agent_own_state_size)

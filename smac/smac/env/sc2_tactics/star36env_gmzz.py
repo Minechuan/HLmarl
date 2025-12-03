@@ -49,6 +49,8 @@ class SC2TacticsGMZZEnv(te.SC2TacticsEnv):
         print("----------------------")
     
     def get_agent_action(self, a_id, action):
+
+        
         """Construct the action for agent a_id."""
         avail_actions = self.get_avail_agent_actions(a_id)
         assert (

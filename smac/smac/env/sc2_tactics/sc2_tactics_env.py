@@ -986,17 +986,21 @@ class SC2TacticsEnv(MultiAgentEnv):
 
             # Movement features
             avail_actions = self.get_avail_agent_actions(agent_id)
+
+            # observable available move directions
             for m in range(self.n_actions_move):
                 move_feats[m] = avail_actions[m + 2]
 
             ind = self.n_actions_move
 
+            # 8 surrounding pathing grid values
             if self.obs_pathing_grid:
                 move_feats[
                     ind : ind + self.n_obs_pathing  # noqa
                 ] = self.get_surrounding_pathing(unit)
                 ind += self.n_obs_pathing
 
+            # 9 surrounding terrain height values
             if self.obs_terrain_height:
                 move_feats[ind:] = self.get_surrounding_height(unit)
 

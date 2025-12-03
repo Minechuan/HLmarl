@@ -58,7 +58,7 @@ python3 src/main.py --config=qatten --env-config=sc2te with env_args.map_name=sd
 Run a different algorithm, e.g., Qatten2:
 
 ```bash
-python3 src/main.py --config=qatten2 --env-config=sc2te with env_args.map_name=sdjx_te use_tensorboard=True
+python3 src/main.py --config=qatten2 --env-config=sc2te with env_args.map_name=sdjx_te use_tensorboard=True local_results_path="results_ENVNAME_qatten2"
 ```
 
 On Linux you can use parallel training. For example, to train with 1024 environments in parallel, you can use:
@@ -118,7 +118,7 @@ Copy to pymarl-like directory, because each pymarl-like repo often need to insta
 Or link the SC2 path to the target path:
 
 ```bash
-ln -s /home/featurize/work/RL/StarCraftII /home/featurize/StarCraftII
+ln -s $StarCraftII_path$ ./3rdparty/StarCraftII
 ```
 
 
@@ -133,6 +133,23 @@ killall -9 Main_Thread
 ValueError: Unknown game version: 4.10.0. Known versions: ['latest']
 ```
 Linux's replay has old version. Double click replay file. Game will install old version automatically.
+
+If can not open:
+
+```bash
+# check replay version
+python -m pysc2.bin.replay_version  .\jctq_te.SC2Replay
+```
+e.g., Version(game_version='5.0.14', build_version=94137, data_version='519EE8D06E384469C652DD58FC6016AC', binary=None)
+
+
+```python
+# update pysc2
+# F:\project\Anaconda3\anaconda\envs\smac_env\Lib\site-packages\pysc2\run_configs\lib.py
+# append
+
+Version("5.0.14", 94137, "519EE8D06E384469C652DD58FC6016AC", None),
+```
 
 
 
