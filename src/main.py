@@ -92,8 +92,14 @@ if __name__ == '__main__':
     ex.add_config(config_dict)
 
     # Save to disk by default for sacred
-    logger.info("Saving to FileStorageObserver in results/sacred.")
-    file_obs_path = os.path.join(results_path, "sacred")
-    ex.observers.append(FileStorageObserver.create(file_obs_path))
+    no_save = False
+    if "--no-save" in params:
+        no_save = True
+        params.remove("--no-save")   # 必须移除，否则 Sacred 会报警告
+
+    if not no_save:
+        logger.info("Saving to FileStorageObserver in results/sacred.")
+        file_obs_path = os.path.join(results_path, "sacred")
+        ex.observers.append(FileStorageObserver.create(file_obs_path))
 
     ex.run_commandline(params)

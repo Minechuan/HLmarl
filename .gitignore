@@ -1,8 +1,110 @@
-# 忽略第三方和结果目录
+# ----------------------------
+# repo-wide ignores (global)
+# ----------------------------
+
+# Common python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+dist/
+eggs/
+*.egg-info/
+*.egg
+
+# PyInstaller / logs / caches
+*.manifest
+*.spec
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Testing / coverage
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+.noseids
+.hypothesis/
+.pytest_cache/
+cover/
+
+# envs
+.env
+.venv
+venv/
+ENV/
+venv.bak/
+
+# Jupyter
+.ipynb_checkpoints
+
+# IDE
+.spyderproject
+.spyproject
+
+# mypy / pytype / pyre
+.mypy_cache/
+.dmypy.json
+.pyre/
+.pytype/
+
+# other common files
+*.zip
+*.mo
+*.pot
+docs/_build/
+
+# Optional: third-party directories from top-level .gitignore you showed
 3rdparty/
 results/
 results_qatten2/
 
-# 忽略所有 __pycache__
-**/__pycache__/
-**/*.zip
+# ----------------------------
+# smac-specific ignores (only for smac/)
+# prefix with /smac/ to limit scope
+# ----------------------------
+
+/smac/__pycache__/
+/smac/*.py[cod]
+/smac/*$py.class
+
+# build/artifacts under smac
+/smac/build/
+/smac/dist/
+/smac/downloads/
+/smac/eggs/
+/smac/.eggs/
+/smac/lib/
+/smac/lib64/
+/smac/parts/
+/smac/wheels/
+/smac/*.egg-info/
+/smac/.tox/
+/smac/.nox/
+/smac/.pytest_cache/
+/smac/htmlcov/
+/smac/.ipynb_checkpoints
+
+# smac virtualenvs, localsettings
+/smac/.env
+/smac/.venv
+/smac/venv/
+/smac/ENV/
+/smac/venv.bak/
+
+/smac/.pytest_cache/
+/smac/.mypy_cache/
+/smac/.pytype/
+/smac/cython_debug/
+
+# any other smac-specific directories you want to contain
+/smac/instance/
+/smac/.webassets-cache
