@@ -243,6 +243,7 @@ class SC2TacticsSDJXEnv(te.SC2TacticsEnv):
         ally_state = np.zeros((self.n_agents, nf_al))
         enemy_state = np.zeros((self.n_enemies, nf_en))
 
+
         center_x = self.map_x / 2
         center_y = self.map_y / 2
 
@@ -300,6 +301,7 @@ class SC2TacticsSDJXEnv(te.SC2TacticsEnv):
                     enemy_state[e_id, 3] = e_unit.shield / max_shield  # shield
 
                 if self.unit_type_bits > 0:
+                    
                     type_id = self.get_unit_type_id(e_unit, False)
                     enemy_state[e_id, type_id - self.unit_type_bits] = 1
 

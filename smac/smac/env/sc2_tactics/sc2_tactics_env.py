@@ -3,7 +3,6 @@ from __future__ import division
 from __future__ import print_function
 
 from smac.env.multiagentenv import MultiAgentEnv
-# from smac.env.starcraft2.maps import get_map_params
 from smac.env.sc2_tactics.maps import get_map_params
 from smac.env.sc2_tactics.utils import map_specific_utils
 from smac.env.sc2_tactics.utils import common_utils
@@ -979,6 +978,7 @@ class SC2TacticsEnv(MultiAgentEnv):
         ally_feats = np.zeros(ally_feats_dim, dtype=np.float32)
         own_feats = np.zeros(own_feats_dim, dtype=np.float32)
 
+
         if unit != None and unit.health > 0:  # otherwise dead, return all zeros
             x = unit.pos.x
             y = unit.pos.y
@@ -1149,6 +1149,7 @@ class SC2TacticsEnv(MultiAgentEnv):
             return obs_concat
 
         state_dict = self.get_state_dict()
+
 
         state = np.append(
             state_dict["allies"].flatten(), state_dict["enemies"].flatten()

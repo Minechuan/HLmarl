@@ -1,5 +1,8 @@
 from functools import partial
+# Environments for original SC2
 from smac.env import MultiAgentEnv, StarCraft2Env, SC2TacticsEnv
+
+# Environments for SC2 Tactics scenarios
 from smac.env.sc2_tactics.sc2_tactics_env import SC2TacticsEnv_NEW
 from smac.env.sc2_tactics.star36env_sdjx import SC2TacticsSDJXEnv
 from smac.env.sc2_tactics.star36env_dhls import SC2TacticsDHLSEnv
