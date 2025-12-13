@@ -279,7 +279,6 @@ def run_sequential(args, logger):
     logger.console_logger.info("Finished Training")
 
 
-# TODO: Clean this up
 def args_sanity_check(config, _log):
 
     # set CUDA flags
@@ -292,15 +291,5 @@ def args_sanity_check(config, _log):
         config["test_nepisode"] = config["batch_size_run"]
     else:
         config["test_nepisode"] = (config["test_nepisode"]//config["batch_size_run"]) * config["batch_size_run"]
-
-    # assert (config["run_mode"] in ["parallel_subproc"] and config["use_replay_buffer"]) or (not config["run_mode"] in ["parallel_subproc"]),  \
-    #     "need to use replay buffer if running in parallel mode!"
-
-    # assert not (not config["use_replay_buffer"] and (config["batch_size_run"]!=config["batch_size"]) ) , "if not using replay buffer, require batch_size and batch_size_run to be the same."
-
-    # if config["learner"] == "coma":
-    #    assert (config["run_mode"] in ["parallel_subproc"]  and config["batch_size_run"]==config["batch_size"]) or \
-    #    (not config["run_mode"] in ["parallel_subproc"]  and not config["use_replay_buffer"]), \
-    #        "cannot use replay buffer for coma, unless in parallel mode, when it needs to have exactly have size batch_size."
 
     return config
