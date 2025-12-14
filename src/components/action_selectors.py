@@ -16,11 +16,13 @@ class MultinomialActionSelector():
                                               decay="linear")
         self.epsilon = self.schedule.eval(0)
         self.test_greedy = getattr(args, "test_greedy", True)
+        self.save_probs = getattr(self.args, 'save_probs', False)
 
     def select_action(self, agent_inputs, avail_actions, t_env, test_mode=False):
         masked_policies = agent_inputs.clone()
         masked_policies[avail_actions == 0.0] = 0.0
-
+        masked_policies = masked_policies / masked_policies.sum(dim=-1, keepdim=True)
+    
         self.epsilon = self.schedule.eval(t_env)
 
         if test_mode and self.test_greedy:
@@ -28,9 +30,16 @@ class MultinomialActionSelector():
         else:
             picked_actions = Categorical(masked_policies).sample().long()
 
-        return picked_actions
+        if self.save_probs:
+            return picked_actions, masked_policies
+        else:
+            return picked_actions
 
 REGISTRY["multinomial"] = MultinomialActionSelector
+
+def categorical_entropy(probs):
+    assert probs.size(-1) > 1
+    return Categorical(probs=probs).entropy()
 
 
 class EpsilonGreedyActionSelector():

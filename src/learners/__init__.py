@@ -8,6 +8,7 @@ from .q_learner_w import QLearner as WeightedQLearner
 from .qatten_learner import QattenLearner
 from .dmaq_qatten_learner import DMAQ_qattenLearner
 from .qatten_learner2 import QattenLearner2 as QattenLearner2
+from .ppo_learner import PPOLearner
 
 REGISTRY = {}
 
@@ -21,4 +22,5 @@ REGISTRY["ddpg"] = DDPGQLearner
 REGISTRY["qatten_learner"] = QattenLearner
 REGISTRY["dmaq_qatten_learner"] = DMAQ_qattenLearner
 REGISTRY["qatten_learner2"] = QattenLearner2
+REGISTRY["ppo_learner"] = PPOLearner
 

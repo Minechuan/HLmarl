@@ -149,8 +149,15 @@ def run_sequential(args, logger):
         "terminated": {
             "vshape": (1,), 
             "dtype": th.uint8
-        },
+        },        
     }
+    # ippo需要保存probs
+    if getattr(args, "save_probs", False):
+        scheme["probs"] = {
+            "vshape": (env_info["n_actions"],),
+            "group": "agents",
+            "dtype": th.float32 
+        }
 
 
     groups = {

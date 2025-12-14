@@ -6,10 +6,12 @@ epsilon_start: 1.0
 epsilon_finish: 0.05
 epsilon_anneal_time: 50000
 
+t_max: 4050000
+
 runner: "episode"
-
+batch_size_run: 1
 buffer_size: 5000
-
+batch_size: 32
 # update the target network every {} episodes
 target_update_interval: 200
 
@@ -36,5 +38,7 @@ weighted_head: False  # weighted head Q-values, for MMM2 and 3s5z_vs_3s6z, it is
 nonlinear: False  # non-linearity, for MMM2, it is True
 
 burn_in_period: 100
+
+save_model: True
 
 name: "qatten"

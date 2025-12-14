@@ -66,6 +66,7 @@ docs/_build/
 3rdparty/
 results/
 results_qatten2/
+logs/
 
 # ----------------------------
 # smac-specific ignores (only for smac/)
