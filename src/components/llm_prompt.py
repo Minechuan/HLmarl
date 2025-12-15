@@ -39,7 +39,10 @@ Use these helpers if present on `self`:
 * self.get_distance(pos1, pos2)
 * self.find_closest_enemy(ally_pos, enemy_dict)
 * self.get_move_direction(cur, target)
-* self.validate(unit_id, action, obs)  # may or may not exist
+* self.validate(unit_id, action, obs)
+
+If you call a helper `self.validate(...)` and return False, perhaps the terrain is preventing us from moving forward; consider exploring other available action directions.
+
 
 ### REQUIRED CODE PATTERNS
 
@@ -121,7 +124,7 @@ Victory Condition: {victory_condition}
   for uid in obs['ally']:
   if uid not in actions:
   actions[uid] = 'stop' if 'stop' in obs['ally'][uid]['available_actions'] else obs['ally'][uid]['available_actions'][0]
-* If you call a helper `self.validate(...)`, also include the manual fallback that checks `available_actions` in case helper is absent.
+* If you call a helper `self.validate(...)` and return False, perhaps the terrain is preventing us from moving forward; we could consider exploring other available action directions.
 
 ### SAFETY / DEBUGGING
 

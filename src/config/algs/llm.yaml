@@ -6,11 +6,11 @@ save_replay: False
 
 llm_output_path: ./llm_runs_12_15_3.txt
 llm_model_name: "gemini-3-pro-preview"
-llm_api_key: "sk-..."
+llm_api_key: "sk-"
 llm_url: "https://api.jisuai.top/v1"
 llm_temperature: 1.0
 
-llm_mock: True
+llm_mock: False # 使用 agent runner 中最后一个函数的输出作为 llm 的输出，方便调试
 play_nepisode: 1
 
 llm_victory_condition: "Destroy the enemy Command Center."

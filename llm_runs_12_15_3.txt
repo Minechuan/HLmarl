@@ -79,3 +79,83 @@ def execute(self, obs):
                 actions[uid] = avail[0]
                 
     return actions, trigger_met
+
+
+# Event 0 Response:
+def execute(self, obs):
+    actions = {}
+    trigger_met = False
+
+    # Initialization
+    if not hasattr(self, 'init_done'):
+        self.init_done = True
+        self.bait_id = None
+        self.bait_start_health = 35.0
+
+        # Identify Nydus Network and Zerglings
+        nydus_id = 1
+        zerglings = [uid for uid, u in obs['ally'].items() if u['unit_type'] == 'zergling']
+
+        if nydus_id in obs['ally'] and zerglings:
+            nydus_pos = obs['ally'][nydus_id]['coords']
+            # Select bait farthest from Nydus Network
+            furthest_id = -1
+            max_dist = -1
+            for z_id in zerglings:
+                dist = self.get_distance(obs['ally'][z_id]['coords'], nydus_pos)
+                if dist > max_dist:
+                    max_dist = dist
+                    furthest_id = z_id
+            
+            self.bait_id = furthest_id
+            self.bait_start_health = obs['ally'][self.bait_id]['health']
+
+    # Locations
+    enemy_cc_pos = [46.5, 64.5]
+    if 4 in obs['enemy']:
+        enemy_cc_pos = obs['enemy'][4]['coords']
+    
+    nydus_pos = [28.5, 11.5]
+    if 1 in obs['ally']:
+        nydus_pos = obs['ally'][1]['coords']
+
+    # Trigger Logic: Bait is attacked
+    if self.bait_id is not None:
+        if self.bait_id not in obs['ally']:
+            # Bait died, meaning it was attacked
+            trigger_met = True
+        elif obs['ally'][self.bait_id]['health'] < self.bait_start_health:
+            trigger_met = True
+
+    # Action Logic
+    for uid, unit in obs['ally'].items():
+        # Buildings
+        if unit['unit_type'] in ['hatchery', 'nydusCanal']:
+            actions[uid] = 'stop'
+            continue
+        
+        # Nydus Network (ID 1) should not load units yet
+        if uid == 1:
+            actions[uid] = 'stop'
+            continue
+
+        # Mobile Units
+        if uid == self.bait_id:
+            # Bait moves toward enemy base
+            action = self.get_move_direction(unit['coords'], enemy_cc_pos)
+            if self.validate(uid, action, obs):
+                actions[uid] = action
+        else:
+            # Others move toward Nydus Network
+            if unit['unit_type'] in ['zergling', 'roach']:
+                action = self.get_move_direction(unit['coords'], nydus_pos)
+                if self.validate(uid, action, obs):
+                    actions[uid] = action
+
+    # Safety fill
+    for uid in obs['ally']:
+        if uid not in actions:
+            avail = obs['ally'][uid]['available_actions']
+            actions[uid] = 'stop' if 'stop' in avail else avail[0]
+
+    return actions, trigger_met

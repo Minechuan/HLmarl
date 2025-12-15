@@ -123,12 +123,10 @@ class CommanderContext:
     
     def validate(self, unit_id, action, obs):
         avail = obs['ally'][unit_id]['available_actions']
+        
         if action in avail:
-            return action
-        if 'stop' in avail:
-            return 'stop'
-        return avail[0] if avail else 'stop'
-
+            return True
+        return False
 
 
 

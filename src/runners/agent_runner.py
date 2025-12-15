@@ -198,8 +198,7 @@ class AgentRunner:
             '''[DEBUG] 每 10 步打印一次 bait_id 和各单位到敌方 CommandCenter 的距离'''
             if self.t % 10 == 0:
                 bait_id = self.commander.bait_id
-                print(f"[System]: Initial bait_id is {bait_id}")
-                print("Agents load by NydusNetwork",self.env.load.keys())
+                # print("Agents load by NydusNetwork",self.env.load.keys())
                 for i, v in llm_info_dict['enemy'].items():
                     if v['unit_type'] == 'CommandCenter':
                         coord = v['coords']
@@ -208,7 +207,9 @@ class AgentRunner:
                     dist = self.commander.get_distance(v['coords'], coord)
                     dist_dict[i] = round(dist,1)
                 print ("Distance:", dist_dict)
-                print(high_action[bait_id])
+                print(f"bait_id: {bait_id}")
+                print( f"bait action: {high_action}")
+                print(f"bait available actions: {llm_info_dict['ally'][bait_id]['available_actions']}")
 
 
             high_action_list.append(high_action)
