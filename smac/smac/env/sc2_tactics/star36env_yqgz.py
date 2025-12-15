@@ -46,10 +46,7 @@ class SC2TacticsYQGZEnv(te.SC2TacticsEnv):
         print("You create a YQGZ env!")
         print("----------------------")
 
-    def _init_assign_aliases(self, min_unit_type):
-        self._min_unit_type = min_unit_type
-        self.rlunit_ids = common_utils.generate_unit_aliases_pure(self.map_name, min_unit_type)
-        print(self.rlunit_ids)
+
 
     def get_unit_type_id(self, unit, ally):
         """Returns the ID of unit type in the given scenario."""

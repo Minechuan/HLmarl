@@ -690,10 +690,6 @@ class SC2TacticsFKWZEnv(te.SC2TacticsEnv):
         """Returns the max load of the WarpPrism, which is 4"""
         return 4
 
-    def _init_assign_aliases(self, min_unit_type):
-        self._min_unit_type = min_unit_type
-        self.rlunit_ids = common_utils.generate_unit_aliases_pure(self.map_name, min_unit_type)
-        print(self.rlunit_ids)
 
     def update_units(self):
         self.resource = self._obs.observation.player_common.minerals

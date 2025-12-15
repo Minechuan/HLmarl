@@ -253,10 +253,6 @@ class SC2TacticsADCCEnv(te.SC2TacticsEnv):
             # only no-op allowed
             return [1] + [0] * (self.n_actions - 1)
     
-    def _init_assign_aliases(self, min_unit_type):
-        self._min_unit_type = min_unit_type
-        self.rlunit_ids = common_utils.generate_unit_aliases_pure(self.map_name, min_unit_type)
-        print(self.rlunit_ids)
 
     def check_structure(self, ally = True):
         """Check if the enemy's CommandCenter or the agent's Hatchery is destroyed."""

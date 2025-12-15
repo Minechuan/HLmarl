@@ -26,21 +26,34 @@ from utils.timehelper import time_left, time_str
 from os.path import dirname, abspath
 
 # Registries
-from learners import REGISTRY as le_REGISTRY
 from runners import REGISTRY as r_REGISTRY
-from controllers import REGISTRY as mac_REGISTRY #这里导入的mac
-
-
-
-from components.episode_buffer import ReplayBuffer
 from components.transforms import OneHot
 
 
 
-def run(args, logger):
+
+def run_agent(_run, _config, _log):
+    # check args sanity
+    _config = args_sanity_check(_config, _log)
+
+    args = SN(**_config)
+    args.device = "cuda" if args.use_cuda else "cpu"
+    print(f"Using device {args.device}")
+
+
+    # sacred is on by default
+
+    # Run and train
+    run_agent_framework(args=args)
+
+    # Clean up after finishing
+    print("Exiting Main")
+
+
+def run_agent_framework(args):
 
     # Init runner so we can get env info
-    runner = r_REGISTRY[args.runner](args=args, logger=logger,save_dir = args.llm_output_path)
+    runner = r_REGISTRY[args.runner](args=args)
     assert args.runner == "agent", "Only agent runner is supported in the current framework."
 
 
@@ -60,13 +73,19 @@ def run(args, logger):
         episode_return_list.append(episode_return)
 
         print(f"Episode {i+1} finished.\n")
-        print("LLM Output save location: {}".format(save_file))
         print("#" * 20)
     
     '''Summary of all episodes'''
     mean_won_rate = sum(1 for result in battle_result_list if result==True) / len(battle_result_list)
     print("All episodes completed.")
     print(f"Mean won rate: {mean_won_rate:.2f}")
+
+    if args.save_replay:
+        runner.save_replay()
+
+    # Making sure framework really exits
+    runner.close_env()
+    os._exit(os.EX_OK)
 
     
 

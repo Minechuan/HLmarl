@@ -390,11 +390,9 @@ map_param_registry = {
         "b_race": "T",
         "unit_type_bits": 5,
         "map_type": "dhls",
-        # "action_configs": {
         "support_info": {
             "n_actions_no_attack": 5,
             "n_actions_move": 4,
-            # "n_actions": 10,
             "actions": {
                 "move": 16,
                 "attack": 23,
@@ -414,6 +412,11 @@ map_param_registry = {
                 "nydusCanal": 142,
                 "roach": 110,
                 "zergling": 105,
+            },
+            'enemy_unit_id_dict': {
+                'CommandCenter': 18,
+                'SiegeTank': 33,
+                'Marine': 48,
             }
         }
     },

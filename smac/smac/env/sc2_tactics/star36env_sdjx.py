@@ -359,10 +359,7 @@ class SC2TacticsSDJXEnv(te.SC2TacticsEnv):
         except (protocol.ProtocolError, protocol.ConnectionError):
             self.full_restart()
 
-    def _init_assign_aliases(self, min_unit_type):
-        self._min_unit_type = min_unit_type
-        self.rlunit_ids = common_utils.generate_unit_aliases_pure(self.map_name, min_unit_type)
-        print(self.rlunit_ids)
+
 
     def only_medivac_left(self, ally):
         """Check if only Medivac units are left."""

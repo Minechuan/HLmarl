@@ -278,7 +278,7 @@ class SC2TacticsDHLSEnv(te.SC2TacticsEnv):
             elif unit.unit_type == 18:
                 type_id = 2
         return type_id
-    
+
     def update_units(self):
         """Update units after an environment step.
         This function assumes that self._obs is up-to-date.
@@ -350,10 +350,6 @@ class SC2TacticsDHLSEnv(te.SC2TacticsEnv):
         ]
         self._controller.debug(debug_command)
 
-    def _init_assign_aliases(self, min_unit_type):
-        self._min_unit_type = min_unit_type
-        self.rlunit_ids = common_utils.generate_unit_aliases_pure(self.map_name, min_unit_type)
-        print(self.rlunit_ids)
 
     def check_structure(self, ally = True):
         """Check if the enemy's Nexus unit is killed."""
@@ -405,3 +401,103 @@ class SC2TacticsDHLSEnv(te.SC2TacticsEnv):
             if a_tag == t_unit.tag:
                 return True
         return updated
+
+    '''Add your own functions below'''
+    def get_agent_avail_llm_actions(self, agent_id):
+        unit = self.get_unit_by_id(agent_id)
+
+        # 1. Check if agent is dead
+        if unit.health == 0:
+            return ["no-op"], "agent is dead"
+
+        # 2. Check if agent is loaded (immobilized)
+        # Loaded agents effectively cannot act, so we expose "stop" with a specific reason
+        if agent_id in self.load:
+            return ["stop"], "The agent is loaded by nydusNetwork"
+
+        # 3. Get raw available actions from environment
+        avail = self.get_avail_agent_actions(agent_id)
+        avail_action_names = []
+
+        # Map raw indices to action names
+        # Action 0: no-op (Should be handled by health check, but included for completeness)
+        if avail[0] == 1:
+            avail_action_names.append("no-op")
+
+        # Action 1: stop
+        if avail[1] == 1:
+            avail_action_names.append("stop")
+
+        # Actions 2-5: Movement
+        move_map = {
+            2: "move_north",
+            3: "move_south",
+            4: "move_east",
+            5: "move_west"
+        }
+        for idx in range(2, 6):
+            if avail[idx] == 1:
+                avail_action_names.append(move_map[idx])
+
+        # Action 6: Special Nydus Actions
+        if avail[6] == 1:
+            if unit.unit_type == self.rlunit_ids.get("nydusNetwork"):
+                avail_action_names.append("NydusCanalLoad")
+            elif unit.unit_type == self.rlunit_ids.get("nydusCanal"):
+                avail_action_names.append("NydusCanalUnload")
+            else:
+                avail_action_names.append("special_action")
+
+        # Actions > 6: Attack
+        # Logic: target_id = action_index - n_actions_no_attack
+        for idx in range(self.n_actions_no_attack, len(avail)):
+            if avail[idx] == 1:
+                target_id = idx - self.n_actions_no_attack
+                avail_action_names.append(f"attack_enemy_{target_id}")
+
+        # 4. Determine no_action_reason
+        no_action_reason = ""
+
+        if len(avail_action_names) == 1 and avail_action_names[0] == "no-op":
+            no_action_reason = "agent is dead"
+
+        elif len(avail_action_names) == 1 and avail_action_names[0] == "stop":
+            # Identify unit name for explanation
+            unit_name = "Unit"
+            for name, uid in self.rlunit_ids.items():
+                if uid == unit.unit_type:
+                    unit_name = name.capitalize()
+                    break
+            
+            # Check if it is a mobile unit (Roach/Zergling) that is blocked/unable to attack
+            is_mobile = (unit.unit_type == self.rlunit_ids.get("roach") or 
+                        unit.unit_type == self.rlunit_ids.get("zergling"))
+
+            if is_mobile:
+                no_action_reason = "The agent cannot move or attack"
+            else:
+                # It is a structure limited by type (e.g. Hatchery, Pylon, or inactive Nydus)
+                no_action_reason = f"The agent is {unit_name}, action can only be 'stop'"
+
+        return avail_action_names, no_action_reason
+    
+
+    def map_action_name_to_one_hot(self, action_name):
+        one_hot_action = [0] * self.n_actions
+        action_map = {
+            "no-op": 0,
+            "stop": 1,
+            "move_north": 2,
+            "move_south": 3,
+            "move_east": 4,
+            "move_west": 5,
+            "NydusCanalLoad": 6,
+            "NydusCanalUnload": 6,
+            "special_action": 6
+            }
+        if action_name in action_map:
+            one_hot_action[action_map[action_name]] = 1
+        elif action_name.startswith("attack_enemy_"):
+            target_id = int(action_name.split("_")[-1])
+            one_hot_action[target_id + self.n_actions_no_attack] = 1
+        return one_hot_action

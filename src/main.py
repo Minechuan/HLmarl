@@ -10,8 +10,12 @@ import sys
 import torch as th
 from utils.logging import get_logger
 import yaml
+from termcolor import cprint
 
+
+# decide to run normal or agent framework
 from run import run
+from run_agent_framework import run_agent
 
 SETTINGS['CAPTURE_MODE'] = "fd" # set to "no" if you want to see stdout/stderr in console
 logger = get_logger()
@@ -25,14 +29,23 @@ results_path = os.path.join(dirname(dirname(abspath(__file__))), "results")
 
 @ex.main
 def my_main(_run, _config, _log):
-    # Setting the random seed throughout the modules
+    # copy config
     config = config_copy(_config)
+
+    # seed
     np.random.seed(config["seed"])
     th.manual_seed(config["seed"])
     config['env_args']['seed'] = config["seed"]
 
-    # run the framework
-    run(_run, config, _log) # 调用run方法
+    # decide run mode
+    if config.get("use_agent_framework", False):
+        _log.info("Running with agent framework")
+        cprint("Running with agent framework", "green")
+        run_agent(_run, config, _log)
+    else:
+        _log.info("Running normal framework")
+        cprint("Running RL framework", "green")
+        run(_run, config, _log)
 
 
 def _get_config(params, arg_name, subfolder):
@@ -84,11 +97,11 @@ if __name__ == '__main__':
     # Load algorithm and env base configs
     env_config = _get_config(params, "--env-config", "envs")
     alg_config = _get_config(params, "--config", "algs")
-    # config_dict = {**config_dict, **env_config, **alg_config}
     config_dict = recursive_dict_update(config_dict, env_config)
     config_dict = recursive_dict_update(config_dict, alg_config)
 
     # now add all the config to sacred
+    config_dict["use_agent_framework"] = False
     ex.add_config(config_dict)
 
     # Save to disk by default for sacred

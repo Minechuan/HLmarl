@@ -1,0 +1,81 @@
+
+
+# Event 0 Response:
+def execute(self, obs):
+    if not hasattr(self, 'init_done'):
+        self.init_done = True
+        self.bait_id = None
+        self.nydus_id = None
+        self.bait_start_health = 0
+        
+        # Find Nydus Network
+        for uid, unit in obs['ally'].items():
+            if unit['unit_type'] == 'nydusNetwork':
+                self.nydus_id = uid
+                break
+        
+        # Find Bait Zergling (farthest from Nydus)
+        if self.nydus_id is not None:
+            nydus_pos = obs['ally'][self.nydus_id]['coords']
+            max_dist = -1
+            best_id = None
+            for uid, unit in obs['ally'].items():
+                if unit['unit_type'] == 'zergling':
+                    dist = self.get_distance(unit['coords'], nydus_pos)
+                    if dist > max_dist:
+                        max_dist = dist
+                        best_id = uid
+            self.bait_id = best_id
+            
+        if self.bait_id is not None and self.bait_id in obs['ally']:
+            self.bait_start_health = obs['ally'][self.bait_id]['health']
+
+    actions = {}
+    trigger_met = False
+
+    # Check Trigger: Bait attacked
+    if self.bait_id in obs['ally']:
+        current_health = obs['ally'][self.bait_id]['health']
+        if current_health < self.bait_start_health:
+            trigger_met = True
+    
+    # Define Targets
+    enemy_cc_pos = None
+    for uid, unit in obs['enemy'].items():
+        if unit['unit_type'] == 'CommandCenter':
+            enemy_cc_pos = unit['coords']
+            break
+    
+    nydus_pos = None
+    if self.nydus_id in obs['ally']:
+        nydus_pos = obs['ally'][self.nydus_id]['coords']
+
+    # Assign Actions
+    for uid, unit in obs['ally'].items():
+        # Skip buildings for movement logic (handled by safety fill)
+        if unit['unit_type'] in ['hatchery', 'nydusNetwork', 'nydusCanal']:
+            continue
+        
+        if uid == self.bait_id:
+            # Bait moves to enemy base
+            if enemy_cc_pos:
+                action = self.get_move_direction(unit['coords'], enemy_cc_pos)
+                if self.validate(uid, action, obs):
+                    actions[uid] = action
+        else:
+            # Others move to Nydus Network
+            if nydus_pos:
+                action = self.get_move_direction(unit['coords'], nydus_pos)
+                if self.validate(uid, action, obs):
+                    actions[uid] = action
+                    
+    # Safety Fill
+    for uid in obs['ally']:
+        if uid not in actions:
+            avail = obs['ally'][uid]['available_actions']
+            if 'stop' in avail:
+                actions[uid] = 'stop'
+            elif avail:
+                actions[uid] = avail[0]
+                
+    return actions, trigger_met

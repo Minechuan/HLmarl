@@ -158,6 +158,21 @@ def generate_unit_aliases_pure(map_name, min_unit_type):
     rl_unit_types = {unit_name: unit_id for unit_name, unit_id in unit_offsets.items()}
     return rl_unit_types
 
+def generate_unit_aliases_enemy(map_name):
+
+    map_params = get_map_params(map_name)
+    if not map_params or "support_info" not in map_params:
+        raise ValueError(f"No support_info found for map {map_name}")
+
+    # 提取单位偏移信息
+    unit_offsets = map_params["support_info"].get("enemy_unit_id_dict", {})
+    
+    # 生成敌方单位别名映射
+    rl_enemy_unit_types = {unit_name: unit_id for unit_name, unit_id in unit_offsets.items()}
+    return rl_enemy_unit_types
+
+
+
 def build_cooldown_map(rl_unit_types):
     """
     Builds a cooldown map by combining rl_unit_types and UNIT_COOLDOWNS.

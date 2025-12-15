@@ -1,0 +1,77 @@
+
+
+# Event 0 Response:
+def execute(self, obs):
+    actions = {}
+    trigger_met = False
+
+    # Initialization
+    if not hasattr(self, 'init_done'):
+        self.init_done = True
+        self.bait_id = None
+        self.bait_max_health = 35.0
+        self.nydus_network_id = None
+        self.nydus_pos = [28.5, 11.5]  # Default from snapshot
+        self.enemy_cc_pos = [46.5, 64.5]  # Default from snapshot
+
+        # Find Nydus Network
+        for uid, unit in obs['ally'].items():
+            if unit['unit_type'] == 'nydusNetwork':
+                self.nydus_network_id = uid
+                self.nydus_pos = unit['coords']
+                break
+
+        # Select Bait Zergling (randomly/first available)
+        zerglings = [uid for uid, unit in obs['ally'].items() if unit['unit_type'] == 'zergling']
+        if zerglings:
+            self.bait_id = zerglings[0]
+
+        # Locate Enemy Command Center
+        for uid, unit in obs['enemy'].items():
+            if unit['unit_type'] == 'CommandCenter':
+                self.enemy_cc_pos = unit['coords']
+                break
+
+    # Check Trigger: Bait Zergling is attacked
+    if self.bait_id:
+        if self.bait_id not in obs['ally']:
+            # Bait is dead, implies it was attacked
+            trigger_met = True
+        else:
+            bait_unit = obs['ally'][self.bait_id]
+            if bait_unit['health'] < self.bait_max_health:
+                trigger_met = True
+
+    # Assign Actions
+    for uid, unit in obs['ally'].items():
+        action = 'stop'  # Default fallback
+
+        if uid == self.bait_id:
+            # Bait moves toward enemy base
+            action = self.get_move_direction(unit['coords'], self.enemy_cc_pos)
+        
+        elif unit['unit_type'] == 'nydusNetwork':
+            # Network loads units
+            if 'NydusCanalLoad' in unit['available_actions']:
+                action = 'NydusCanalLoad'
+            else:
+                action = 'stop'
+        
+        elif unit['unit_type'] in ['zergling', 'roach']:
+            # Others move toward Nydus Network
+            dist = self.get_distance(unit['coords'], self.nydus_pos)
+            if dist > 2.0:
+                action = self.get_move_direction(unit['coords'], self.nydus_pos)
+            else:
+                action = 'stop' # Wait to be loaded
+
+        # Validate action availability
+        if action not in unit['available_actions']:
+            if 'stop' in unit['available_actions']:
+                action = 'stop'
+            elif len(unit['available_actions']) > 0:
+                action = unit['available_actions'][0]
+        
+        actions[uid] = action
+
+    return actions, trigger_met

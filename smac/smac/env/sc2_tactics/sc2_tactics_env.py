@@ -1130,6 +1130,198 @@ class SC2TacticsEnv(MultiAgentEnv):
 
         return agent_obs
 
+    '''#####################################################################'''
+    def llm_obs_dict(self,agent_id):
+        """Return the observation in dictionary format for LLM-based agents.
+        Args:
+            agent_id (int, optional): 指定获取某个智能体的观察。
+        """
+        unit = self.get_unit_by_id(agent_id)
+        
+        # 基础结构
+        obs_dict = {
+            "agent_id": agent_id,
+            "step": self._episode_steps,
+            "step_ratio": self._episode_steps / self.episode_limit,
+            "status": "dead",
+            "self_info": {},
+            "navigation": {},
+            "tactical": {
+                "visible_enemies": [],
+                "visible_allies": []
+            }
+        }
+
+        # 如果单位不存在或已死亡，返回基础死亡状态
+        if unit is None or unit.health <= 0:
+            return obs_dict
+            
+        # --- 1. 自身信息 (Self Info) ---
+        obs_dict["status"] = "alive"
+        
+        # 获取最大护盾值 (复用原逻辑中的 common_utils 或尝试从单位属性获取)
+        max_shield = 0
+        if self.shield_bits_ally > 0:
+            try:
+                # 尝试使用 common_utils (假设已导入)
+                max_shield = common_utils.unit_max_shield(unit.unit_type, self.rlunit_ids)
+            except:
+                # 备用方案：如果在某些版本中没有 common_utils，通常 max_shield 可以估算或忽略
+                max_shield = unit.max_shield if hasattr(unit, 'max_shield') else 0
+
+
+        # 保留小数点后一位
+        obs_dict["self_info"] = {
+            "unit_type": self.unit_type_to_unit_name[unit.unit_type],
+            "pos_x": round(unit.pos.x, 1),
+            "pos_y": round(unit.pos.y, 1),
+            "health": round(unit.health, 1),
+            "health_max": round(unit.health_max, 1),
+            "health_ratio": round(unit.health / unit.health_max, 1),
+            "shield": round(unit.shield, 1),
+            "shield_max": max_shield,
+            "shield_ratio": (unit.shield / max_shield) if max_shield > 0 else 0.0
+        }
+
+        # --- 准备计算数据 ---
+        x = unit.pos.x
+        y = unit.pos.y
+        sight_range = self.unit_sight_range(agent_id)
+        avail_actions = self.get_avail_agent_actions(agent_id)
+
+        # --- 2. 移动与导航 (Navigation) ---
+        # 解析可移动方向 (SMAC 通常映射: 0:stop, 1:hold, 2:North, 3:South, 4:East, 5:West)
+        # 注意：具体的动作索引映射取决于环境配置 (n_actions_move)
+        move_directions = ["north", "south", "east", "west"]
+        available_moves = []
+        
+        # 检查移动动作 (通常从索引 2 开始)
+        for m in range(self.n_actions_move):
+            if avail_actions[m + 2]:  
+                # 防止索引越界（如果 n_actions_move > 4）
+                dir_name = move_directions[m] if m < len(move_directions) else f"dir_{m}"
+                available_moves.append(dir_name)
+
+        obs_dict["navigation"] = {
+            "can_move": len(available_moves) > 0,
+            "available_directions": available_moves,
+            "sight_range": sight_range
+        }
+
+        # 地形高度和路径网格 (如果有开启)
+        if self.obs_pathing_grid:
+            obs_dict["navigation"]["surrounding_pathing"] = self.get_surrounding_pathing(unit)
+        if self.obs_terrain_height:
+            obs_dict["navigation"]["surrounding_height"] = self.get_surrounding_height(unit)
+
+        # --- 3. 敌方特征 (Enemy Features) ---
+        for e_id, e_unit in self.enemies.items():
+            if e_unit is None:
+                continue
+            
+            e_x = e_unit.pos.x
+            e_y = e_unit.pos.y
+            dist = self.distance(x, y, e_x, e_y)
+
+            # 存活
+            if e_unit.health > 0:
+                # 检查是否在射程内 (能攻击)
+                # 攻击动作通常在 No-Op, Stop, Move 之后
+                can_attack = False
+                attack_action_id = self.n_actions_no_attack + e_id
+                if attack_action_id < len(avail_actions) and avail_actions[attack_action_id] == 1:
+                    can_attack = True
+
+                enemy_max_shield = 0
+                if self.shield_bits_enemy > 0:
+                    try:
+                        enemy_max_shield = common_utils.unit_max_shield(e_unit.unit_type, self.rlunit_ids)
+                    except:
+                        enemy_max_shield = e_unit.max_shield if hasattr(e_unit, 'max_shield') else 0
+
+                enemy_data = {
+                    "id": e_id,
+                    "unit_type": self.enemy_unit_type_to_unit_name[e_unit.unit_type],
+                    "distance": round(dist, 1),
+                    "pos_x": round(e_x, 1),
+                    "pos_y": round(e_y, 1),
+                    "health": round(e_unit.health, 1),
+                    "health_ratio": round(e_unit.health / e_unit.health_max, 1),
+                    "shield": round(e_unit.shield, 1),
+                    "can_attack": can_attack  # 对 LLM 决策非常关键
+                }
+                obs_dict["tactical"]["visible_enemies"].append(enemy_data)
+
+        # --- 4. 友方特征 (Ally Features) ---
+        al_ids = [al_id for al_id in range(self.n_agents) if al_id != agent_id]
+        # transform al_ids to actual alive ally ids
+        for al_id in al_ids:
+            al_unit = self.get_unit_by_id(al_id)
+            if al_unit is None: 
+                continue
+                
+            al_x = al_unit.pos.x
+            al_y = al_unit.pos.y
+            dist = self.distance(x, y, al_x, al_y)
+
+            # 可见且存活
+            if dist < sight_range and al_unit.health > 0:
+                ally_max_shield = 0
+                if self.shield_bits_ally > 0:
+                    try:
+                        ally_max_shield = common_utils.unit_max_shield(al_unit.unit_type, self.rlunit_ids)
+                    except:
+                        ally_max_shield = al_unit.max_shield if hasattr(al_unit, 'max_shield') else 0
+
+                ally_data = {
+                    "id": al_id,
+                    "unit_type": self.unit_type_to_unit_name[al_unit.unit_type],
+                    "distance": round(dist, 1),
+                    "pos_x": round(al_x, 1),
+                    "pos_y": round(al_y, 1),
+                    "health": round(al_unit.health, 1),
+                    "shield": round(al_unit.shield, 1),
+                }
+                
+                # 如果开启了观察上一步动作
+                if self.obs_last_action:
+                    # 将 One-Hot 动作转为列表或原始索引 (这里简化为列表)
+                    ally_data["last_action_raw"] = self.last_action[al_id].tolist()
+
+                obs_dict["tactical"]["visible_allies"].append(ally_data)
+
+        # 排序：让 LLM 优先关注最近的敌人/盟友 (可选优化)
+        obs_dict["tactical"]["visible_enemies"].sort(key=lambda k: k['distance'])
+        obs_dict["tactical"]["visible_allies"].sort(key=lambda k: k['distance'])
+
+        return obs_dict
+
+
+    def get_llm_info_dict(self):
+        '''Returns all agent observations & available actions in a dictionary.'''
+        
+        
+        
+        agents_obs = {i: self.llm_obs_dict(i) for i in range(self.n_agents)}
+
+        # get_agent_avail_llm_actions return a list of action names and a string of reason
+        agents_avail_actions = {i: self.get_agent_avail_llm_actions(i) for i in range(self.n_agents)}
+        
+        # combine the two dicts
+        for i in range(self.n_agents):
+            agents_obs[i]["available_actions"] = agents_avail_actions[i][0]
+            agents_obs[i]["unavailable_reason"] = agents_avail_actions[i][1]
+
+        from smac.env.sc2_tactics.utils.agent_framework_utils import simplify_obs
+        llm_obs = simplify_obs(list(agents_obs.values()))
+
+        # for k in simplified_obs.keys():
+        #     print(f"Simplified Obs Key: {k}, Sample Value: {simplified_obs[k]}")
+        
+        return llm_obs
+    '''#####################################################################'''
+
+
     def get_obs(self):
         """Returns all agent observations in a list.
         NOTE: Agents should have access only to their local observations
@@ -1572,6 +1764,7 @@ class SC2TacticsEnv(MultiAgentEnv):
                 min_unit_type = min(
                     unit.unit_type for unit in self.agents.values()
                 )
+
                 self._init_assign_aliases(min_unit_type)
                 self.cooldown_map = common_utils.build_cooldown_map(self.rlunit_ids)
 
@@ -1659,39 +1852,21 @@ class SC2TacticsEnv(MultiAgentEnv):
     
     def _init_assign_aliases(self, min_unit_type):
         self._min_unit_type = min_unit_type
-        self.rlunit_ids = common_utils.generate_unit_aliases(self.map_name, min_unit_type)
-        print(self.rlunit_ids)
+        self.rlunit_ids = common_utils.generate_unit_aliases_pure(self.map_name, min_unit_type)
+        self.unit_type_to_unit_name = {
+            v: k for k, v in self.rlunit_ids.items()
+        }
         
-    """
-    def _init_ally_unit_types(self, min_unit_type):
-        #Initialise ally unit types. Should be called once from the init_units function.
+        print("agent:",self.rlunit_ids)
+
+        # get enemy unit type to name mapping
+        self.enemy_unit_ids = common_utils.generate_unit_aliases_enemy(self.map_name)
+        self.enemy_unit_type_to_unit_name = {
+            v: k for k, v in self.enemy_unit_ids.items()
+        }
+        print("enemy:",self.enemy_unit_ids)
+
         
-        self._min_unit_type = min_unit_type
-        if self.map_type == "marines":
-            self.marine_id = min_unit_type
-        elif self.map_type == "stalkers_and_zealots":
-            self.stalker_id = min_unit_type
-            self.zealot_id = min_unit_type + 1
-        elif self.map_type == "colossi_stalkers_zealots":
-            self.colossus_id = min_unit_type
-            self.stalker_id = min_unit_type + 1
-            self.zealot_id = min_unit_type + 2
-        elif self.map_type == "MMM":
-            self.marauder_id = min_unit_type
-            self.marine_id = min_unit_type + 1
-            self.medivac_id = min_unit_type + 2
-        elif self.map_type == "zealots":
-            self.zealot_id = min_unit_type
-        elif self.map_type == "hydralisks":
-            self.hydralisk_id = min_unit_type
-        elif self.map_type == "stalkers":
-            self.stalker_id = min_unit_type
-        elif self.map_type == "colossus":
-            self.colossus_id = min_unit_type
-        elif self.map_type == "bane":
-            self.baneling_id = min_unit_type
-            self.zergling_id = min_unit_type + 1
-    """
     
     def only_medivac_left(self, ally):
         """Check if only Medivac units are left."""

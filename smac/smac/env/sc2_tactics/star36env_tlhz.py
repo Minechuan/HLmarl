@@ -642,10 +642,6 @@ class SC2TacticsTLHZEnv(te.SC2TacticsEnv):
         env_info["n_agents"] = self.n_agents_max
         return env_info
 
-    def _init_assign_aliases(self, min_unit_type):
-        self._min_unit_type = min_unit_type
-        self.rlunit_ids = common_utils.generate_unit_aliases_pure(self.map_name, min_unit_type)
-        print(self.rlunit_ids)
 
     def update_units(self):
         self.modify_units()
