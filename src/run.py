@@ -22,6 +22,8 @@ from controllers import REGISTRY as mac_REGISTRY #这里导入的mac
 from components.episode_buffer import ReplayBuffer
 from components.transforms import OneHot
 
+from termcolor import cprint
+
 def run(_run, _config, _log, pymongo_client=None):
 
     # check args sanity
@@ -76,14 +78,21 @@ def run(_run, _config, _log, pymongo_client=None):
 
 def evaluate_sequential(args, runner):
 
+    won_cnt = 0
     for _ in range(args.test_nepisode):
-        runner.run(test_mode=True)
+        _, battle_result = runner.run(test_mode=True)
+        if battle_result:
+            won_cnt += 1
 
     if args.save_replay:
         runner.save_replay()
 
     runner.close_env()
-
+    succ_rate = won_cnt / args.test_nepisode
+    cprint("=========================================", "green")
+    cprint(f"Evaluation over {args.test_nepisode} episodes: won {won_cnt} episodes, success rate {succ_rate:.2f}")
+    cprint("=========================================", "green")
+    
 def run_sequential(args, logger):
 
     # Init runner so we can get env info
@@ -230,7 +239,7 @@ def run_sequential(args, logger):
     while runner.t_env <= args.t_max:
 
         # Run for a whole episode at a time
-        episode_batch = runner.run(test_mode=False)
+        episode_batch, battle_result = runner.run(test_mode=False)
         buffer.insert_episode_batch(episode_batch)
 
         if buffer.can_sample(args.batch_size):

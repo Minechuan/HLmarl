@@ -65,9 +65,12 @@ docs/_build/
 # Optional: third-party directories from top-level .gitignore you showed
 3rdparty/
 results/
+results_*/ # for multiple result directories
 results_qatten2/
+results_mappo/
 logs/
-results_mappo
+
+
 
 # ----------------------------
 # smac-specific ignores (only for smac/)

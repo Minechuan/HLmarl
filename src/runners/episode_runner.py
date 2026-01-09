@@ -118,7 +118,9 @@ class EpisodeRunner:
                 self.logger.log_stat("epsilon", self.mac.action_selector.epsilon, self.t_env)
             self.log_train_stats_t = self.t_env
 
-        return self.batch
+        battle_result = env_info.get("battle_won", False)
+
+        return self.batch, battle_result
 
     def _log(self, returns, stats, prefix):
         self.logger.log_stat(prefix + "reward_mean", float(np.mean(returns["reward"])), self.t_env)

@@ -1,24 +1,19 @@
-# Multi-Agent Reinforcement Learning (MARL)
+# Learning Human-like Stragegies for Multi-agent Cooperation in StarCraft II
+
+## 0. Introduction
+
+This repository contains the code for the project "Learning Human-like Strategies for Multi-agent Cooperation in StarCraft II", which is built upon the [SMAC](https://github.com/oxwhirl/smac) environment.
+
+This project is the final project for the course "Reinforcement Learning" of Peking University.
 
 
+Our main contributions include:
+* Experiments on advanced maps from **HLSMAC** benchmark, including 12 challenging maps with human-designed strategies.
+* Improved training algorithms based on Qatten -- **Qatten2**.
+* Implementation of an **agent framework** with LLM integration.
 
-## 0. Basic Reference 
-
-Make sure to understand the environment before experiments
-
-
-### SMAC Environment
-The [StarCraft Multi-Agent Challenge (SMAC)](https://github.com/oxwhirl/smac) environment is a widely used benchmark for evaluating multi-agent reinforcement learning algorithms. It provides a set of scenarios where multiple agents must cooperate to achieve a common goal, such as defeating enemy units or completing tasks.
-
-### pymarl
-
-[pymarl](https://github.com/oxwhirl/pymarl) is a framework for implementing and testing multi-agent reinforcement learning algorithms. It provides a modular architecture that allows researchers to easily experiment with different algorithms, environments, and configurations.
-
-
-### Other frameworks
-
-Like [pymarl2](https://github.com/hijkzzz/pymarl2), [ReszQ](https://github.com/xmu-rl-3dv/ResQ/tree/main/ResZ/src), [wqmix](https://github.com/oxwhirl/wqmix), etc. they are all based on pymarl and provide implementations of various MARL algorithms and enhancements. So we suggest you to start with pymarl first. To train or test other exclusive algorithms, you can **refer to** their respective repositories for specific instructions. **Copy** the ``learners/xxx.py``, ``modules/xxx.py`` and ``config/algs/xxx.yaml`` to our codebase and make small adjustments, which is based on pymarl.
-
+The agent framework pipeline is as follows:
+![pipeline](./documents/pipeline.png)
 
 ## 1. Environment Setup
 
@@ -51,67 +46,60 @@ python src/main.py --config=qatten --env-config=sc2te with env_args.map_name=sdj
 
 The ablove only saves sacred logs, just for testing whether the environment works. If you are debugging, you can add ``--no-save`` to avoid saving sacred logs.
 
-## 2. Training: To train the agents, you can use the following command:
+## 2. Run the Experiments
 
-refering to: https://github.com/oxwhirl/pymarl#watching-starcraft-ii-replays
+### 2.1 Test the learner we have trained:
+
+**Test Qatten2** (with checkpoint provided in ``checkpoints/qatten2``):
+
+>We save the checkpoint whose won rate is not less than 30%. Choose \$NAME\$ from [gmzz_te, sdjx_te, swct_te, jdsr_te, wwjz_te, wzsy_te]
+
+```bash
+python src/main.py --config=qatten2 --env-config=sc2te with env_args.map_name=$NAME$ checkpoint_path=./checkpoints/qatten2/$NAME$ test_nepisode=32 save_replay=True runner=episode save_model=False use_tensorboard=False evaluate=True batch_size_run=1
+```
+
+**Test MAPPO** (with checkpoint provided in ``checkpoints/mappo``):
+
+[TODO] 下面这条命令跑不通
+
+```bash
+python src/main.py --config=ippo --env-config=sc2te with env_args.map_name=gmzz_te use_tensorboard=False checkpoint_path=./checkpoints/mappo/gmzz_te test_nepisode=32 save_replay=True runner=episode save_model=False evaluate=True
+```
+
+**Test Agent Framework**:
+
+First check if the API worsks:
+
+```bash
+python check_api.py
+```
+
+If you want to use your own API, modify ``src/config/algs/llm_dhls.yaml``.
+
+Then run the agent framework on a map:
+
+>Because of the limited times we only support following maps. If you want to test other maps, please refer to RUN_AGENT.md to change the necessary configurations.
 
 
 ```bash
-python src/main.py --config=qatten --env-config=sc2te with env_args.map_name=sdjx_te use_tensorboard=True
-```
-
-Run a different algorithm, e.g., Qatten2:
-
-```bash
-python src/main.py --config=qatten2 --env-config=sc2te with env_args.map_name=sdjx_te use_tensorboard=True local_results_path="results_ENVNAME_qatten2"
-```
-
-On Linux you can use parallel training. For example, to train with 1024 environments in parallel, you can use:
-
-```yaml
-# orinal config file:
-runner: "episode" # Runs 1 env for an episode
-batch_size_run: 1
-
-# change to:
-runner: "parallel" # Runs multiple envs in parallel
-batch_size_run: 1024 # e.g., 1024
+python src/main.py --config=llm_dhls --env-config=sc2te with env_args.map_name=dhls_te use_tensorboard=False runner=agent save_replay=True --no-save use_agent_framework=True
 ```
 
 
-You can use ``use_tensorboard`` to visualize the training process in TensorBoard. 
+### 2.2 Run your own experiments:
+
+* If you want to train your own agents with reinforcement learning, please refer to [RUN_RL.md](./documents/RUN_RL.md).
+* If you want to test the agents with human-like strategies on other maps, please refer to [RUN_AGENT.md](./documents/RUN_AGENT.md).
 
 
+## 3. Record demonstration videos and replays
 
-## 3. Deployment: To deploy the trained agents, you can use the following command:
+1. Set ``save_replay=True`` in the command line to save replays during testing.
+2. Download replays from ``3rdparty/StarCraftII/Replays``.
+3. Copy to Windows machine with StarCraft II installed. The detailed path rules are similar to TA's guidance.
 
-``save_replay`` option allows saving replays of models which are loaded using ``checkpoint_path``. Once the model is successfully loaded, ``test_nepisode`` number of episodes are run on the test mode and a .SC2Replay file is saved in the Replay directory of StarCraft II. Please make sure to use the **episode runner** if you wish to save a replay, i.e., ``runner=episode``. The name of the saved replay file starts with the given ``env_args.replay_dir`` and ``env_args.replay_prefix`` (map_name if empty). Following is an example command to run a trained model and save the replay:
-
-```bash
-python src/main.py --config=qmix --env-config=sc2 with env_args.map_name=2s3z checkpoint_path=path/to/checkpoint test_nepisode=1 save_replay=True runner=episode env_args.save_replay_prefix=2s3z save_model=False use_tensorboard=False
-```
-
-To watch the replay, you have two options:
-
-1. Store the model checkpoint and copy it to Windows. Run on the above command on Windows machine.
-2. Directly run on Linux machine. And copy the replay file to Windows machine.
-
-
-
-To watch the replay, you can use following command on Windows machine/double click the replay file:
-
-```bash
-python -m pysc2.bin.play --norender --replay <path-to-replay>
-```
 
 ## 4. Issues
-
-
-**Stdout Error on Windows**
-
-If you encounter an encoding error related to `stdout` while running the environment on Windows. Maybe the original config is output to a ``.txt`` file. You can change ``main.py`` to print to output to command directly.
-
-
 
 **Path error**: Can't find the SC2 path. 
 
@@ -123,12 +111,6 @@ Or link the SC2 path to the target path:
 ln -s $StarCraftII_path$ ./3rdparty/StarCraftII
 ```
 
-
-**kill** existing SC2 process:
-
-```
-killall -9 Main_Thread
-```
 
 **Replay Error**:
 ```

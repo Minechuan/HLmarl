@@ -11,6 +11,7 @@ llm_url: "https://api.jisuai.top/v1"
 llm_temperature: 1.0
 
 llm_mock: False # 使用 agent runner 中最后一个函数的输出作为 llm 的输出，方便调试
+# False 时使用真实的 llm 接口
 play_nepisode: 1
 
 llm_victory_condition: "Destroy the enemy Command Center."

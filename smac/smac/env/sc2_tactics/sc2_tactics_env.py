@@ -1880,14 +1880,14 @@ class SC2TacticsEnv(MultiAgentEnv):
             v: k for k, v in self.rlunit_ids.items()
         }
         
-        print("agent:",self.rlunit_ids)
+        # print("agent:",self.rlunit_ids)
 
         # get enemy unit type to name mapping
         self.enemy_unit_ids = common_utils.generate_unit_aliases_enemy(self.map_name)
         self.enemy_unit_type_to_unit_name = {
             v: k for k, v in self.enemy_unit_ids.items()
         }
-        print("enemy:",self.enemy_unit_ids)
+        # print("enemy:",self.enemy_unit_ids)
 
         
     
