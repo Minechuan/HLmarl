@@ -23,6 +23,7 @@ Below is a guidance to set up your development environment for the project (on l
 Based on course homework readme, you can set up the environment by following these steps:
 1. Cloned this repository to your local machine.
    ```bash
+   git clone --depth 1 https://github.com/Minechuan/HLmarl.git
    pip install -e smac/
    ```
 2. Downloaded SC2 (linux version) from [github repository](https://github.com/Blizzard/s2client-proto). Unzip the downloaded file and place the extracted folder (e.g., ``StarCraftII``) into the ``3rdparty`` directory of this repository (Hint: password is in README.md).
