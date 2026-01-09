@@ -1,4 +1,4 @@
-# Learning Human-like Stragegies for Multi-agent Cooperation in StarCraft II
+# Learning Human-like Strategies for Multi-agent Cooperation in StarCraft II
 
 ## 0. Introduction
 
@@ -60,7 +60,7 @@ python src/main.py --config=qatten2 --env-config=sc2te with env_args.map_name=$N
 
 **Test MAPPO** (with checkpoint provided in ``checkpoints/mappo``):
 
-[TODO] 下面这条命令跑不通
+[TODO] 下面这条命令跑不通突然跑不通，需要重新试一下
 
 ```bash
 python src/main.py --config=ippo --env-config=sc2te with env_args.map_name=gmzz_te use_tensorboard=False checkpoint_path=./checkpoints/mappo/gmzz_te test_nepisode=32 save_replay=True runner=episode save_model=False evaluate=True
