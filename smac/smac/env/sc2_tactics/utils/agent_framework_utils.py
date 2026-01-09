@@ -1,5 +1,5 @@
 import numpy as np
-
+from termcolor import cprint
 
 def find_enemy_information(all_agent_obs):
     """
@@ -51,18 +51,28 @@ def find_ally_information(all_agent_obs):
     """
     ally_dict = {}
     
-    
+    # simplify ally information
     for agent_obs in all_agent_obs:
-        # simplify ally information
         ally_dict[agent_obs['agent_id']] = {}
         ally_dict[agent_obs['agent_id']]['status'] = agent_obs['status']
+        # print("Agent ID:", agent_obs['agent_id'], "Status:", agent_obs['status'])
+        # 
+        #     ally_dict[agent_obs['agent_id']]['health'] = -1
+        #     ally_dict[agent_obs['agent_id']]['unit_'] = -1
+        # else: 
+            
         ally_dict[agent_obs['agent_id']]['unit_type'] = agent_obs['self_info']['unit_type']
+
+
         ally_dict[agent_obs['agent_id']]['coords'] = (agent_obs['self_info']['pos_x'], agent_obs['self_info']['pos_y'])
         ally_dict[agent_obs['agent_id']]['health'] = agent_obs['self_info']['health']
         ally_dict[agent_obs['agent_id']]['shield'] = agent_obs['self_info']['shield']
         ally_dict[agent_obs['agent_id']]['available_actions'] = agent_obs['available_actions']
         ally_dict[agent_obs['agent_id']]['unavailable_reason'] = agent_obs['unavailable_reason']
-    
+        
+        # if ally_dict[agent_obs['agent_id']]['status'] == 'dead':
+        #     cprint(f"Agent available actions: {ally_dict[agent_obs['agent_id']]['available_actions']}", 'red')
+
     return ally_dict
 
 
@@ -82,10 +92,14 @@ def simplify_obs(all_agent_obs):
 
     # get enemy information
     # if enemy can only be seen by one agent, the whole time use that agent's info
+    # print all_agent_obs keys
+    
     
     simple = {}
     enemy_info = find_enemy_information(all_agent_obs)
     simple['enemy'] = enemy_info
+
+
     ally_info = find_ally_information(all_agent_obs)
     simple['ally'] = ally_info
     simple['step'] = all_agent_obs[0]['step']

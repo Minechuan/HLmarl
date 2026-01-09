@@ -24,7 +24,7 @@ from s2clientprotocol import common_pb2 as sc_common
 from s2clientprotocol import sc2api_pb2 as sc_pb
 from s2clientprotocol import raw_pb2 as r_pb
 from s2clientprotocol import debug_pb2 as d_pb
-
+from termcolor import cprint
 import sys
 
 races = {
@@ -410,26 +410,6 @@ class SC2TacticsEnv(MultiAgentEnv):
     def step(self, actions):
         """A single environment step. Returns reward, terminated, info."""
         actions_int = [int(a) for a in actions]
-
-        # pdb manual mode
-        if (False) and hasattr(sys, 'gettrace') and sys.gettrace():
-            breakpoint()
-            actions_int = []
-            print(f"Step {self._episode_steps}")
-            for a_id, a_unit in self.agents.items():
-                if a_unit == None:
-                    actions_int.append(0)
-                    print(f"[Agent {a_id}] is None")
-                    continue
-                avail_act = self.get_avail_agent_actions(a_id)
-                if avail_act[0] == 1:
-                    actions_int.append(0)
-                    print(f"[Agent {a_id} | Type {a_unit.unit_type}] is dead / in load, skip its action")
-                    continue
-                print(f"[Agent {a_id} | Type {a_unit.unit_type}] has available actions: {[i for i, v in enumerate(avail_act) if v == 1]}")
-                act = input(f"Input your action for Agent-{a_id}: ")
-                actions_int.append(1 if act == "" else int(act))
-
         self.last_action = np.eye(self.n_actions)[np.array(actions_int)]
 
         # Collect individual actions
@@ -440,6 +420,7 @@ class SC2TacticsEnv(MultiAgentEnv):
         for a_id, action in enumerate(actions_int):
             if not self.heuristic_ai:
                 sc_action = self.get_agent_action(a_id, action)
+
             else:
                 sc_action, action_num = self.get_agent_action_heuristic(
                     a_id, action
@@ -1153,11 +1134,12 @@ class SC2TacticsEnv(MultiAgentEnv):
         }
 
         # 如果单位不存在或已死亡，返回基础死亡状态
-        if unit is None or unit.health <= 0:
-            return obs_dict
+        if unit is None or unit.health > 0:
+            obs_dict["status"] = "alive"
+            # return obs_dict
             
         # --- 1. 自身信息 (Self Info) ---
-        obs_dict["status"] = "alive"
+        
         
         # 获取最大护盾值 (复用原逻辑中的 common_utils 或尝试从单位属性获取)
         max_shield = 0
@@ -1298,8 +1280,10 @@ class SC2TacticsEnv(MultiAgentEnv):
 
 
     def get_llm_info_dict(self):
-        '''Returns all agent observations & available actions in a dictionary.'''
-        
+        '''
+        Prompt生成前最后的包装, **聚合** obs 和 actions可用动作 打包返回
+        Returns all agent observations & available actions in a dictionary.
+        '''
         
         
         agents_obs = {i: self.llm_obs_dict(i) for i in range(self.n_agents)}
@@ -1307,17 +1291,56 @@ class SC2TacticsEnv(MultiAgentEnv):
         # get_agent_avail_llm_actions return a list of action names and a string of reason
         agents_avail_actions = {i: self.get_agent_avail_llm_actions(i) for i in range(self.n_agents)}
         
+
+
+
+
+
+
+        #######################################
         # combine the two dicts
         for i in range(self.n_agents):
-            agents_obs[i]["available_actions"] = agents_avail_actions[i][0]
+            # [0] actions; [1]: reasons
+            raw_actions = agents_avail_actions[i][0]
+
+            can_move = any("move_" in act for act in raw_actions)
+            # if i==10:
+                # print(f"Agent {i} Raw Actions: {raw_actions}")
+                # print(f"Can Move: {can_move}")
+
+
+            
+            # Remove move_north, move_south etc from the list seen by LLM
+            # Keep 'stop', 'attack_', and other skills
+            filtered_actions = [act for act in raw_actions if "move_" not in act]
+            if can_move:
+                filtered_actions.append("can_move")
+            if "navigation" in agents_obs[i]:
+                agents_obs[i]["navigation"]["can_move"] = can_move
+                # Hide explicit directions so LLM uses navigate_to logic instead of atomic moves
+                if "available_directions" in agents_obs[i]["navigation"]:
+                    del agents_obs[i]["navigation"]["available_directions"]
+
+            agents_obs[i]["available_actions"] = filtered_actions.copy()
             agents_obs[i]["unavailable_reason"] = agents_avail_actions[i][1]
+            # if i==10:
+            #     print(f"[get_llm_info_dict''] Agent {i} Filtered Actions: {filtered_actions}")
 
         from smac.env.sc2_tactics.utils.agent_framework_utils import simplify_obs
-        llm_obs = simplify_obs(list(agents_obs.values()))
+
+        obs_list_value = list(agents_obs.values())
+        
+
+        llm_obs = simplify_obs(obs_list_value)
+
+
 
         # for k in simplified_obs.keys():
         #     print(f"Simplified Obs Key: {k}, Sample Value: {simplified_obs[k]}")
         
+        # for i in range(self.n_agents):
+        #     cprint(agents_obs[i]["available_actions"],"yellow")
+
         return llm_obs
     '''#####################################################################'''
 

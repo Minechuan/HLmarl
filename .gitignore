@@ -67,6 +67,7 @@ docs/_build/
 results/
 results_qatten2/
 logs/
+results_mappo
 
 # ----------------------------
 # smac-specific ignores (only for smac/)
@@ -109,3 +110,5 @@ logs/
 # any other smac-specific directories you want to contain
 /smac/instance/
 /smac/.webassets-cache
+
+llm_runs_*.txt

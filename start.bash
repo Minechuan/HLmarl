@@ -1,0 +1,1 @@
+python src/main.py --config=llm --env-config=sc2te with env_args.map_name=dhls_te use_tensorboard=False runner=agent save_replay=True --no-save use_agent_framework=True

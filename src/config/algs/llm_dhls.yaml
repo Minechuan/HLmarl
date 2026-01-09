@@ -1,12 +1,12 @@
 
 
-save_replay: False
+save_replay: True
 
 
 
-llm_output_path: ./llm_runs_12_15_3.txt
+llm_output_path: ./llm_runs_1_9_3.txt
 llm_model_name: "gemini-3-pro-preview"
-llm_api_key: "sk-"
+llm_api_key: "sk-ELIhvy3qDRcSwGaxCReISEQEuLxaR1sVlQe3e5FrH9Cxgpla"
 llm_url: "https://api.jisuai.top/v1"
 llm_temperature: 1.0
 
@@ -20,11 +20,11 @@ llm_events:
   - strategy: "Randomly select a Zergling as bait farset from Nydus Network. The Zergling moves toward the enemy base. Other agents move toward Nydus Network. Nydus Network can not load any units."
     trigger: "At the start of the battle."
 
-  - strategy: " The Nydus Network loads the other Zerglings and the Roach."
-    trigger: "The bait Zergling is attacked."
+  - strategy: "The Nydus Network loads the other Zerglings and the Roach."
+    trigger: "The bait Zergling moves far from the Nydus Network."
 
-  - strategy: "Unload all units from the Nydus Canal except the bait Zergling."
-    trigger: "All units have been loaded into the Nydus Canal except the bait Zergling."
+  - strategy: "NydusCanal unload all alive Zerglings and the Roach."
+    trigger: "The bait Zergling is attacked and all alive Zerglings and the Roach have been loaded into the Nydus Canal except the bait Zergling. An agent is loaded if and only if -- alive, not buildings and available is only 'stop'."
 
   - strategy: "Attack the enemy Command Center."
     trigger: "All units have been unloaded from the Nydus Canal."

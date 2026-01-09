@@ -177,54 +177,60 @@ class AgentRunner:
         terminated = False
         episode_return = {"reward": 0, "delta_enemy": 0, "delta_deaths": 0, "delta_ally": 0}
         
-
         # Initialize Commander
         llm_info_dict = self.env.get_llm_info_dict()
         self.call_llm_generate_policy(llm_info_dict)
+
         high_action_list = []
         
-        
+
         while not terminated:
             # Get llm info from env
             
             high_action, trigger = self.current_policy_func(llm_info_dict)
-            # print(f"[DEBUG] AgentRunner.run: Step {self.t}, current_event_idx: {self.current_event_idx}")
-            # print(f"[DEBUG] High-level action: {high_action}, Trigger: {trigger}")
-            # print(f"NydusNetwork available actions: {llm_info_dict['ally'][1]['available_actions']}")
-            # print(f"NydusCanalLoad available actions: {llm_info_dict['ally'][15]['available_actions']}")
-            # 计算所有 agent 到地方 基地的平均距离
-            
 
+        
             '''[DEBUG] 每 10 步打印一次 bait_id 和各单位到敌方 CommandCenter 的距离'''
-            if self.t % 10 == 0:
+            if self.current_event_idx == 1 and False:
+                # from termcolor import cprint
+                # cprint(f"\n[DEBUG] Visible Enemies: {list(llm_info_dict['enemy'].keys())}", "yellow")
+
                 bait_id = self.commander.bait_id
                 # print("Agents load by NydusNetwork",self.env.load.keys())
-                for i, v in llm_info_dict['enemy'].items():
-                    if v['unit_type'] == 'CommandCenter':
-                        coord = v['coords']
-                dist_dict = {}
-                for i, v in llm_info_dict['ally'].items():
-                    dist = self.commander.get_distance(v['coords'], coord)
-                    dist_dict[i] = round(dist,1)
-                print ("Distance:", dist_dict)
-                print(f"bait_id: {bait_id}")
-                print( f"bait action: {high_action}")
-                print(f"bait available actions: {llm_info_dict['ally'][bait_id]['available_actions']}")
-
+                # for i, v in llm_info_dict['enemy'].items():
+                #     if v['unit_type'] == 'CommandCenter':
+                #         coord = v['coords']
+                # dist_dict = {}
+                # for i, v in llm_info_dict['ally'].items():
+                #     dist = self.commander.get_distance(v['coords'], coord)
+                #     dist_dict[i] = round(dist,1)
+                # print ("Distance:", dist_dict)
+                # print(f"bait_id: {bait_id}")
+                # print( f"bait action: {high_action[bait_id]}")
+                # print(f"bait status: {llm_info_dict['ally'][bait_id]['status']}")
+                # print(f"bait agent x y is : {llm_info_dict['ally'][bait_id]['coords']}")
+                # for id in [1,2,3]:
+                #     print(f"Unit type {llm_info_dict['ally'][id]['unit_type']} id {id} action: {high_action[id]} status: {llm_info_dict['ally'][id]['status']} Coords: {llm_info_dict['ally'][id]['coords']}")
+                # for id in [0,1,2,15]:
+                #     cprint(f"Unit type {llm_info_dict['ally'][id]['unit_type']} id {id} available act: {llm_info_dict['ally'][id]['available_actions']} action: {high_action[id]}", "green")
 
             high_action_list.append(high_action)
             if trigger:
                 print(f"\n[Trigger Met]: Moving to next phase!")
                 self.current_event_idx += 1
                 if self.current_event_idx < len(self.events):
-                    
                     self.call_llm_generate_policy(llm_info_dict)
                     high_action, trigger = self.current_policy_func(llm_info_dict)
                     high_action_list.append(high_action)
                 else:
                     print("[System]: All events completed. Maintaining last policy.")
             # Take low-level actions
-            actions = self.low_implementer.take_actions(high_action)
+
+
+            actions = self.low_implementer.take_actions(high_action, llm_info_dict)
+            # if self.current_event_idx ==1:
+            #     for id in [0,1,2,15]:
+            #         cprint(f"Low-level action for unit id {id} : {actions[id]}", "blue")
             reward, terminated, env_info = self.env.step(actions)
             reward, delta_enemy, delta_deaths, delta_ally = reward
             episode_return["reward"] += reward
@@ -236,15 +242,23 @@ class AgentRunner:
             # get llm info for next step
             llm_info_dict = self.env.get_llm_info_dict()
 
+        cprint(f"\n[System]: Episode finished in {self.t} steps.", "green")
+        print(" Episode Summary ********************************")
+        for i in llm_info_dict['ally'].values():
+            print(f"Unit type {i['unit_type']} status: {i['status']}")
+        print("************************************************")
         # log episode statistics
         print(f"AgentRunner.run: Episode completed in {self.t} steps. Logging statistics.")
-        print(f"Episode Return: {episode_return}")
         print(f"reward: {episode_return['reward']}, delta_enemy: {episode_return['delta_enemy']}, delta_deaths: {episode_return['delta_deaths']}, delta_ally: {episode_return['delta_ally']}")
-        battle_result = env_info.get("battle_result", 0)
+        print("*********************************")
+        battle_result = env_info["battle_won"]
         if battle_result == True:
-            print("Battle Result: Victory")
+            cprint("Battle Result: Victory", "green")
         elif battle_result == False:
-            print("Battle Result: Defeat")
+            cprint("Battle Result: Defeat", "red")
+        else:
+            cprint("Battle Result: Draw", "yellow")
+        print("************************************************")
 
         # close the env
         
@@ -257,107 +271,395 @@ class AgentRunner:
         # 关键：统一去掉公共缩进
         return textwrap.dedent(code).strip()
 
+    
+
     def _mock_llm_response(self, idx, obs):
         if idx == 0:
             return """
+# Event 0 Response:
 def execute(self, obs):
-    if not hasattr(self, 'init_done'):
-        self.init_done = True
-        self.bait_id = None
-        self.nydus_id = None
-        self.bait_start_health = 0
-        
-        # Find Nydus Network
-        for uid, unit in obs['ally'].items():
-            if unit['unit_type'] == 'nydusNetwork':
-                self.nydus_id = uid
-                break
-        
-        # Find Bait Zergling (farthest from Nydus)
-        if self.nydus_id is not None:
-            nydus_pos = obs['ally'][self.nydus_id]['coords']
-            max_dist = -1
-            best_id = None
-            for uid, unit in obs['ally'].items():
-                if unit['unit_type'] == 'zergling':
-                    dist = self.get_distance(unit['coords'], nydus_pos)
-                    if dist > max_dist:
-                        max_dist = dist
-                        best_id = uid
-            self.bait_id = best_id
-            
-        if self.bait_id is not None and self.bait_id in obs['ally']:
-            self.bait_start_health = obs['ally'][self.bait_id]['health']
-
     actions = {}
     trigger_met = False
 
-    # Check Trigger: Bait attacked
-    if self.bait_id in obs['ally']:
-        current_health = obs['ally'][self.bait_id]['health']
-        if current_health < self.bait_start_health:
+    # Initialization
+    if not hasattr(self, 'init_done'):
+        self.init_done = True
+        
+        # Identify Nydus Network
+        nydus_list = self.get_units_by_type(obs['ally'], 'nydusNetwork')
+        self.nydus_id = nydus_list[0] if nydus_list else None
+
+        # Identify Zerglings
+        zerglings = self.get_units_by_type(obs['ally'], 'zergling')
+        
+        # Select Bait: Zergling farthest from Nydus Network
+        self.bait_id = None
+        if self.nydus_id is not None and zerglings:
+            nydus_pos = obs['ally'][self.nydus_id]['coords']
+            max_dist = -1.0
+            for z_id in zerglings:
+                dist = self.get_distance(obs['ally'][z_id]['coords'], nydus_pos)
+                if dist > max_dist:
+                    max_dist = dist
+                    self.bait_id = z_id
+        elif zerglings:
+            self.bait_id = zerglings[0]
+            
+        # Store initial health to detect if attacked
+        if self.bait_id is not None:
+            self.bait_max_health = obs['ally'][self.bait_id]['health']
+        else:
+            self.bait_max_health = 35.0
+
+    # Check Trigger: Bait Zergling is attacked
+    if self.bait_id is not None:
+        if self.bait_id not in obs['ally']:
+            # Bait died (implies attack)
             trigger_met = True
-    
-    # Define Targets
-    enemy_cc_pos = None
-    for uid, unit in obs['enemy'].items():
-        if unit['unit_type'] == 'CommandCenter':
-            enemy_cc_pos = unit['coords']
-            break
-    
-    nydus_pos = None
-    if self.nydus_id in obs['ally']:
-        nydus_pos = obs['ally'][self.nydus_id]['coords']
+        else:
+            current_health = obs['ally'][self.bait_id]['health']
+            if current_health < self.bait_max_health:
+                trigger_met = True
+
+    # Find target for bait (Enemy Command Center)
+    enemy_ccs = self.get_units_by_type(obs['enemy'], 'CommandCenter')
+    target_cc = enemy_ccs[0] if enemy_ccs else None
 
     # Assign Actions
     for uid, unit in obs['ally'].items():
-        # Skip buildings for movement logic (handled by safety fill)
-        if unit['unit_type'] in ['hatchery', 'nydusNetwork', 'nydusCanal']:
+        if unit['available_actions'] == ['no-op']:
+            actions[uid] = 'no-op'
             continue
-        
+
+        u_type = unit['unit_type']
+
+        # Nydus Network: Do not load units (Phase constraint)
+        if u_type == 'nydusNetwork':
+            actions[uid] = 'stop'
+            continue
+
+        # Bait Logic: Move toward enemy base
         if uid == self.bait_id:
-            # Bait moves to enemy base
-            if enemy_cc_pos:
-                action = self.get_move_direction(unit['coords'], enemy_cc_pos)
-                if self.validate(uid, action, obs):
-                    actions[uid] = action
-        else:
-            # Others move to Nydus Network
-            if nydus_pos:
-                action = self.get_move_direction(unit['coords'], nydus_pos)
-                if self.validate(uid, action, obs):
-                    actions[uid] = action
-                    
-    # Safety Fill
+            if target_cc is not None:
+                actions[uid] = f'navigate_to_enemy_{target_cc}'
+            else:
+                # If no CC, move to any enemy
+                enemies = list(obs['enemy'].keys())
+                if enemies:
+                    actions[uid] = f'navigate_to_enemy_{enemies[0]}'
+                else:
+                    actions[uid] = 'stop'
+            continue
+
+        # Other Mobile Units: Move toward Nydus Network
+        if u_type in ['zergling', 'roach']:
+            if self.nydus_id is not None:
+                actions[uid] = f'navigate_to_ally_{self.nydus_id}'
+            else:
+                actions[uid] = 'stop'
+            continue
+
+        # Default (Hatchery, NydusCanal, etc.)
+        actions[uid] = 'stop'
+
+    # Safety fill
     for uid in obs['ally']:
         if uid not in actions:
             avail = obs['ally'][uid]['available_actions']
-            if 'stop' in avail:
-                actions[uid] = 'stop'
-            elif avail:
-                actions[uid] = avail[0]
-                
-    return actions, trigger_met
+            actions[uid] = 'stop' if 'stop' in avail else avail[0]
 
+    return actions, trigger_met
 """
-        elif idx == 1:
+        if idx == 1:
             return """
 def execute(self, obs):
-    # Phase 2: Unload
-    # 我们可以直接读取上一阶段设定的 self.bait_id，虽然这阶段可能不用
     actions = {}
-    trigger = False
-    
-    # 假设我们让所有单位出来
-    for uid in obs['ally']:
-        if obs['ally'][uid]['unit_type'] == 'nydusNetwork':
-            actions[uid] = 'unload_all'
-            
-    # Trigger logic (simplified)
-    if len(obs['ally']) > 2:
-        trigger = True
+    trigger_met = False
+
+    # Initialization
+    if not hasattr(self, 'init_done'):
+        self.init_done = True
         
-    return actions, trigger
+        # Identify Nydus Network
+        nydus_list = self.get_units_by_type(obs['ally'], 'nydusNetwork')
+        self.nydus_id = nydus_list[0] if nydus_list else None
+
+        # Identify Zerglings
+        zerglings = self.get_units_by_type(obs['ally'], 'zergling')
+        
+        # Select Bait: Zergling farthest from Nydus Network
+        self.bait_id = None
+        if self.nydus_id is not None and zerglings:
+            nydus_pos = obs['ally'][self.nydus_id]['coords']
+            max_dist = -1.0
+            for z_id in zerglings:
+                dist = self.get_distance(obs['ally'][z_id]['coords'], nydus_pos)
+                if dist > max_dist:
+                    max_dist = dist
+                    self.bait_id = z_id
+        elif zerglings:
+            self.bait_id = zerglings[0]
+            
+        # Store initial health to detect if attacked (legacy from Phase 1)
+        if self.bait_id is not None and self.bait_id in obs['ally']:
+            self.bait_max_health = obs['ally'][self.bait_id]['health']
+        else:
+            self.bait_max_health = 35.0
+
+    # Phase 2 Logic
+    
+    # Identify loadable units (Zerglings + Roaches, excluding bait)
+    loadable_units = []
+    unit_types_to_load = ['zergling', 'roach']
+    for uid, unit in obs['ally'].items():
+        if unit['unit_type'] in unit_types_to_load:
+            if uid != self.bait_id:
+                loadable_units.append(uid)
+
+    # Check Trigger: All loadable units are loaded
+    # Loaded definition: Alive but available_actions is only ['stop']
+    unloaded_units = []
+    for uid in loadable_units:
+        avail = obs['ally'][uid]['available_actions']
+        # If unit has actions other than 'stop' (e.g. 'can_move'), it is not loaded
+        if avail != ['stop']:
+            unloaded_units.append(uid)
+            
+    if len(unloaded_units) == 0:
+        trigger_met = True
+
+    # Identify target for Bait
+    enemy_ccs = self.get_units_by_type(obs['enemy'], 'CommandCenter')
+    target_cc = enemy_ccs[0] if enemy_ccs else None
+
+    # Assign Actions
+    for uid, unit in obs['ally'].items():
+        if unit['available_actions'] == ['no-op']:
+            actions[uid] = 'no-op'
+            continue
+
+        u_type = unit['unit_type']
+
+        # Nydus Network: Use Load ability if there are units to load
+        if u_type == 'nydusNetwork':
+            if unloaded_units and 'NydusCanalLoad' in unit['available_actions']:
+                actions[uid] = 'NydusCanalLoad'
+            else:
+                actions[uid] = 'stop'
+            continue
+
+        # Bait: Continue distracting/moving to enemy
+        if uid == self.bait_id:
+            if target_cc:
+                actions[uid] = f'navigate_to_enemy_{target_cc}'
+            else:
+                enemies = list(obs['enemy'].keys())
+                if enemies:
+                    actions[uid] = f'navigate_to_enemy_{enemies[0]}'
+                else:
+                    actions[uid] = 'stop'
+            continue
+
+        # Loadable Units: Move to Nydus Network to get loaded
+        if uid in loadable_units:
+            # Only move if not already loaded (though loaded units usually only have 'stop')
+            if uid in unloaded_units and self.nydus_id is not None:
+                actions[uid] = f'navigate_to_ally_{self.nydus_id}'
+            else:
+                actions[uid] = 'stop'
+            continue
+
+        # Default (Hatchery, NydusCanal, etc.)
+        actions[uid] = 'stop'
+
+    # Safety fill
+    for uid in obs['ally']:
+        if uid not in actions:
+            avail = obs['ally'][uid]['available_actions']
+            actions[uid] = 'stop' if 'stop' in avail else avail[0]
+
+    return actions, trigger_met
 """
+        if idx == 2:
+            return """
+def execute(self, obs):
+    actions = {}
+    trigger_met = False
+
+    # Initialization
+    if not hasattr(self, 'init_done'):
+        self.init_done = True
+        
+        # Identify Nydus Network (Network loads, Canal unloads)
+        nydus_net_list = self.get_units_by_type(obs['ally'], 'nydusNetwork')
+        self.nydus_id = nydus_net_list[0] if nydus_net_list else None
+
+        # Identify Zerglings (Legacy init)
+        zerglings = self.get_units_by_type(obs['ally'], 'zergling')
+        
+        # Select Bait: Zergling farthest from Nydus Network (Legacy logic)
+        self.bait_id = None
+        if self.nydus_id is not None and zerglings:
+            nydus_pos = obs['ally'][self.nydus_id]['coords']
+            max_dist = -1.0
+            for z_id in zerglings:
+                dist = self.get_distance(obs['ally'][z_id]['coords'], nydus_pos)
+                if dist > max_dist:
+                    max_dist = dist
+                    self.bait_id = z_id
+        elif zerglings:
+            self.bait_id = zerglings[0]
+            
+        # Store initial health (Legacy)
+        if self.bait_id is not None and self.bait_id in obs['ally']:
+            self.bait_max_health = obs['ally'][self.bait_id]['health']
+        else:
+            self.bait_max_health = 35.0
+
+    # Phase 3 Logic
+    
+    # 1. Check if units are still loaded
+    # Loaded units typically have unavailable_reason "The agent is loaded..." or just ['stop'] actions
+    # We check if any Zergling or Roach is currently loaded.
+    units_still_loaded = False
+    mobile_types = ['zergling', 'roach']
+    
+    for uid, unit in obs['ally'].items():
+        if unit['unit_type'] in mobile_types:
+            # Check for loaded status via unavailable_reason or restricted actions
+            if 'loaded' in unit.get('unavailable_reason', '').lower():
+                units_still_loaded = True
+                break
+            # Fallback: if alive but only 'stop' is available, assume loaded (unless bait/stuck)
+            if unit['available_actions'] == ['stop'] and uid != self.bait_id:
+                # If bait is alive and stopped, it doesn't count as loaded for the Nydus trigger usually
+                # But to be safe, we check if specific loaded reason exists.
+                # If unavailable_reason is empty but actions=['stop'], might be purely stopped.
+                # However, in the snapshot, loaded units explicitly say "loaded".
+                pass
+
+    if not units_still_loaded:
+        trigger_met = True
+
+    # 2. Assign Actions
+    # Find Nydus Canal (the exit point)
+    nydus_canals = self.get_units_by_type(obs['ally'], 'nydusCanal')
+    nydus_canal_id = nydus_canals[0] if nydus_canals else None
+
+    for uid, unit in obs['ally'].items():
+        if unit['available_actions'] == ['no-op']:
+            actions[uid] = 'no-op'
+            continue
+            
+        u_type = unit['unit_type']
+        
+        # Nydus Canal: Execute Unload
+        if u_type == 'nydusCanal':
+            if 'NydusCanalUnload' in unit['available_actions']:
+                actions[uid] = 'NydusCanalUnload'
+            else:
+                actions[uid] = 'stop'
+            continue
+            
+        # All other units (including Nydus Network): stop
+        # Loaded units can only stop anyway.
+        # Bait (if alive) should just wait or stop this phase.
+        actions[uid] = 'stop'
+
+    # Safety fill
+    for uid in obs['ally']:
+        if uid not in actions:
+            avail = obs['ally'][uid]['available_actions']
+            actions[uid] = 'stop' if 'stop' in avail else avail[0]
+
+    return actions, trigger_met
+"""
+        if idx == 3:
+            return """
+def execute(self, obs):
+    actions = {}
+    trigger_met = False
+
+    # Initialization
+    if not hasattr(self, 'init_done'):
+        self.init_done = True
+        
+        # Legacy fields preservation
+        nydus_net_list = self.get_units_by_type(obs['ally'], 'nydusNetwork')
+        self.nydus_id = nydus_net_list[0] if nydus_net_list else None
+        
+        zerglings = self.get_units_by_type(obs['ally'], 'zergling')
+        # Re-select a theoretical bait just to populate the field if accessed, 
+        # though Phase 4 doesn't distinguish bait anymore.
+        self.bait_id = zerglings[0] if zerglings else None
+        self.bait_max_health = 35.0
+
+    # Phase 4 Logic: Attack Enemy Command Center
+    
+    # Identify Target: Command Center
+    enemy_ccs = self.get_units_by_type(obs['enemy'], 'CommandCenter')
+    target_cc = enemy_ccs[0] if enemy_ccs else None
+
+    # Fallback target: Any enemy (if CC is dead or not visible)
+    enemies = list(obs['enemy'].keys())
+    fallback_target = enemies[0] if enemies else None
+
+    for uid, unit in obs['ally'].items():
+        if unit['available_actions'] == ['no-op']:
+            actions[uid] = 'no-op'
+            continue
+            
+        u_type = unit['unit_type']
+        avail = unit['available_actions']
+        
+        # Structures (Hatchery, NydusNetwork, NydusCanal) cannot attack or move
+        if u_type in ['hatchery', 'nydusNetwork', 'nydusCanal']:
+            actions[uid] = 'stop'
+            continue
+            
+        # Combat Units (Zerglings, Roaches)
+        
+        # 1. If we can attack the CC explicitly, do it.
+        if target_cc:
+            cc_attack_action = f"attack_enemy_{target_cc}"
+            if cc_attack_action in avail:
+                actions[uid] = cc_attack_action
+                continue
+        
+        # 2. If we can move, move towards the CC.
+        if target_cc and 'can_move' in avail:
+            actions[uid] = f"navigate_to_enemy_{target_cc}"
+            continue
+            
+        # 3. Fallback: Attack any enemy within range.
+        # Find first available attack action
+        any_attack = next((a for a in avail if a.startswith('attack_enemy_')), None)
+        if any_attack:
+            actions[uid] = any_attack
+            continue
+            
+        # 4. Fallback: Move towards any enemy.
+        if fallback_target and 'can_move' in avail:
+            actions[uid] = f"navigate_to_enemy_{fallback_target}"
+            continue
+            
+        # 5. Default
+        actions[uid] = 'stop'
+
+    # Safety fill
+    for uid in obs['ally']:
+        if uid not in actions:
+            avail = obs['ally'][uid]['available_actions']
+            actions[uid] = 'stop' if 'stop' in avail else avail[0]
+
+    return actions, trigger_met
+"""
+
+
         return "def execute(self, obs): return {}, False"
 
+    def read_events_from_file(self, filepath,idx):
+        with open(filepath, 'r') as f:
+            lines = f.readlines()
+        events = [line.strip() for line in lines if line.strip()]
+        return events

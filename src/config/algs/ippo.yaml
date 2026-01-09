@@ -17,7 +17,7 @@ accumulated_episodes: 8
 
 mac: 'basic_mac'
 agent: 'rnn'
-t_max: 4050000
+t_max: 10050000
 
 obs_agent_id: True
 

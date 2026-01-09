@@ -24,24 +24,55 @@ Mission Plan: {json.dumps(events, indent=2)}
 
 ### CRITICAL RULES (ENFORCE)
 
-1. Unit IDs in `obs` are INTEGERS.
-2. `actions` must be a dict with exactly one action for every alive unit in `obs['ally']`.
-3. Always validate desired actions against `unit_data['available_actions']`. If unavailable, prefer `'stop'` if present; otherwise pick the first available action.
-4. Do NOT reference units, IDs, buildings, or fields not present in `obs`.
-5. Trigger logic MUST be verifiable from `obs`. If the natural-language trigger is ambiguous or not determinable from `obs`, set `trigger_met = False`.
-6. Do NOT output any text except the Python function. No explanations, no markdown, no comments outside the function. Output must start with `def execute(self, obs):`.
+1. Unit IDs in `obs` are **INTEGERS**.
+
+2. `actions` must be a **dict** with exactly **one action for every alive unit** in `obs['ally']`.
+
+3. **Action Interface**: Each unit has its own `available_actions`.  
+   You must choose **exactly one action** according to the rules below.
+
+   - **MOVEMENT**  
+     - If `'can_move'` in `available_actions`, you **may** output  
+       `navigate_to_enemy_{id}` or `navigate_to_ally_{id}`  
+     - `navigate_*` actions are **allowed even if not explicitly listed** in `available_actions`.
+
+   - **ATTACK**  
+     - If any action in `available_actions` starts with `attack`, you **may** choose one.  
+     - The action **must be chosen directly from** `available_actions`  
+       (e.g., `attack_enemy_0`). You must not add suffixes or modify the action name.
+
+   - **SKILL USAGE**  
+     - If a special skill exists in `available_actions`, you **may** choose it.  
+     - The action **must be chosen directly from** `available_actions`  
+       (e.g., `NydusCanalLoad`). You must not add suffixes or modify the action name.
+
+   - **STOP (Mandatory)**  
+     - If `available_actions == ['stop']`, you **must** return `stop`.
+
+   - **NO-OP (Mandatory)**  
+     - If `available_actions == ['no-op']` (unit is dead), you **must** return `no-op`.
+
+4. Do **NOT** reference units, IDs, buildings, or fields not present in `obs`.
+
+5. Trigger logic **MUST** be verifiable from `obs`.  
+   If a natural-language trigger is ambiguous or not determinable from `obs`, set  
+   `trigger_met = False`.
+
+6. Do **NOT** output any text except the Python function.  
+   - No explanations  
+   - No markdown  
+   - No comments outside the function  
+   - Output **must start with**:
+   ```python
+   def execute(self, obs):
 
 ### AVAILABLE HELPERS
 
 Use these helpers if present on `self`:
 
-* self.get_units_by_type(units_dict, type_name)
-* self.get_distance(pos1, pos2)
-* self.find_closest_enemy(ally_pos, enemy_dict)
-* self.get_move_direction(cur, target)
-* self.validate(unit_id, action, obs)
-
-If you call a helper `self.validate(...)` and return False, perhaps the terrain is preventing us from moving forward; consider exploring other available action directions.
+* self.get_units_by_type(units_dict, type_name) -> Returns a LIST of integer IDs (e.g. [1, 5]). Do NOT use .keys().
+* self.get_distance(pos1, pos2) -> Returns Euclidean distance between two (x, y) positions.
+* self.validate(unit_id, action, obs) # Use ONLY for checking ATTACK actions.
 
 
 ### REQUIRED CODE PATTERNS
@@ -56,11 +87,18 @@ If you call a helper `self.validate(...)` and return False, perhaps the terrain 
   actions[uid] = 'stop' if 'stop' in obs['ally'][uid]['available_actions'] else obs['ally'][uid]['available_actions'][0]
 * Final return: `return actions, trigger_met`
 
-### PHASE INSTRUCTION
+### PHASE INSTRUCTION (natural language)
+
+* The Trigger is the condition that caused this phase to start.
+* The Strategy describes the high-level plan for this phase.
+* `trigger_met` must indicate whether the next phase's trigger condition is satisfied.
 
 Phase {current_event_idx + 1}/{len(events)}
+Trigger (This phase was triggered by): "{current_event['trigger']}"
 Strategy: "{current_event['strategy']}"
-Trigger (natural language): "{current_event['trigger']}"
+Next Phase Trigger: "{events[current_event_idx + 1]['trigger'] if current_event_idx + 1 < len(events) else 'N/A'}"
+Victory Condition: {victory_condition}
+
 
 ### EXPECTED STYLE
 
@@ -74,6 +112,30 @@ Trigger (natural language): "{current_event['trigger']}"
 * Must follow the initialization and final safety check patterns above.
   """
    return prompt
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 def get_subsequent_prompt(events, current_event_idx, victory_condition, existing_memory_keys, current_obs):
    current_event = events[current_event_idx]
@@ -93,7 +155,29 @@ that implements micro-management for Phase {current_event_idx + 1} and returns (
 ### CRITICAL RULES
 1. Unit IDs in `obs` are INTEGERS.
 2. `actions` must contain exactly one action for every alive unit in `obs['ally']`.
-3. Validate desired actions against `unit_data['available_actions']`. Fallback: 'stop' if available, else first available.
+3. **Action Interface**: Each unit has its own `available_actions`.  
+   You must choose **exactly one action** according to the rules below.
+
+   - **MOVEMENT**  
+     - If `'can_move'` in `available_actions`, you **may** output  
+       `navigate_to_enemy_{id}` or `navigate_to_ally_{id}`  
+     - `navigate_*` actions are **allowed even if not explicitly listed** in `available_actions` but 'can_move' is must listed in `available_actions`.
+
+   - **ATTACK**  
+     - If any action in `available_actions` starts with `attack`, you **may** choose one.  
+     - The action **must be chosen directly from** `available_actions`  
+       (e.g., `attack_enemy_0`). You must not add suffixes or modify the action name.
+
+   - **SKILL USAGE**  
+     - If a special skill exists in `available_actions`, you **may** choose it.  
+     - The action **must be chosen directly from** `available_actions`  
+       (e.g., `NydusCanalLoad`). You must not add suffixes or modify the action name.
+
+   - **STOP (Mandatory)**  
+     - If `available_actions == ['stop']`, you **must** return `stop`.
+
+   - **NO-OP (Mandatory)**  
+     - If `available_actions == ['no-op']` (unit is dead), you **must** return `no-op`.
 4. Do NOT invent units, IDs, or fields not present in `obs`.
 5. If a persistent ID stored on `self` (e.g. self.bait_id) is missing from `obs['ally']`, treat it as dead and do not reference it for targeting or movement.
 6. Trigger must be verifiable from `obs`. If ambiguous, set `trigger_met = False`.
@@ -104,10 +188,15 @@ that implements micro-management for Phase {current_event_idx + 1} and returns (
 {json.dumps(current_obs, indent=2)}
 ```
 
-### PHASE INSTRUCTION
+### PHASE INSTRUCTION (natural language)
 
+* The Trigger is the condition that caused this phase to start.
+* The Strategy describes the high-level plan for this phase.
+* `trigger_met` must indicate whether the next phase's trigger condition is satisfied.
+
+Trigger (This phase was triggered by): "{current_event['trigger']}"
 Strategy: "{current_event['strategy']}"
-Trigger (natural language): "{current_event['trigger']}"
+Next Phase Trigger: "{events[current_event_idx + 1]['trigger'] if current_event_idx + 1 < len(events) else 'N/A'}"
 Victory Condition: {victory_condition}
 
 ### EXISTING PERSISTENT FIELDS (from history)
@@ -124,7 +213,6 @@ Victory Condition: {victory_condition}
   for uid in obs['ally']:
   if uid not in actions:
   actions[uid] = 'stop' if 'stop' in obs['ally'][uid]['available_actions'] else obs['ally'][uid]['available_actions'][0]
-* If you call a helper `self.validate(...)` and return False, perhaps the terrain is preventing us from moving forward; we could consider exploring other available action directions.
 
 ### SAFETY / DEBUGGING
 

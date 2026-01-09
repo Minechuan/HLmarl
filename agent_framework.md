@@ -42,7 +42,7 @@ Add your API keys to `src/config/algs/llm.yaml` and ensure you have access to th
 Run the agent framework with the following command (make sure the flag `use_agent_framework=True` is set):
 
 ```bash
-python src/main.py --config=llm --env-config=sc2te with env_args.map_name=dhls_te use_tensorboard=False runner=agent save_replay=False --no-save use_agent_framework=True
+python src/main.py --config=llm --env-config=sc2te with env_args.map_name=dhls_te use_tensorboard=False runner=agent save_replay=True --no-save use_agent_framework=True
 ```
 
 add ``save_replay=True`` if you want to save replays.

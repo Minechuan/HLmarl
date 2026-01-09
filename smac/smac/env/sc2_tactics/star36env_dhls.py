@@ -416,7 +416,7 @@ class SC2TacticsDHLSEnv(te.SC2TacticsEnv):
             return ["stop"], "The agent is loaded by nydusNetwork"
 
         # 3. Get raw available actions from environment
-        avail = self.get_avail_agent_actions(agent_id)
+        avail = self.get_avail_agent_actions(agent_id) # 一串[0,1,1,0,...]
         avail_action_names = []
 
         # Map raw indices to action names
