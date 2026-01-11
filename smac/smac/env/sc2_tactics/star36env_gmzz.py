@@ -257,3 +257,106 @@ class SC2TacticsGMZZEnv(te.SC2TacticsEnv):
                     return False
             return True
         return False
+    
+    '''Add your own functions below'''
+    def get_agent_avail_llm_actions(self, agent_id):
+        unit = self.get_unit_by_id(agent_id)
+        # 1. Handle Dead Agents: Only no-op is available
+        if unit.health == 0:
+            return ["no-op"], "agent is dead"
+
+        avail_action_names = []
+
+        # 2. Logic for Alive Agents
+        # 'stop' is always available for alive units (matches get_avail_agent_actions logic)
+        avail_action_names.append("stop")
+
+        # Check for Depot specific logic (matches get_avail_agent_actions logic)
+        depot_id = self.rlunit_ids.get("Depot")
+        depot_lowered_id = self.rlunit_ids.get("DepotLowered")
+
+        if unit.unit_type == depot_id:
+            avail_action_names.append("DepotLower")
+            # Depots return immediately; they cannot move or attack in this env
+            return avail_action_names, ""
+        elif unit.unit_type == depot_lowered_id:
+            avail_action_names.append("DepotRaise")
+            return avail_action_names, ""
+
+        # Check Movement (Indices 2-5)
+        # Replicates self.can_move checks from get_avail_agent_actions
+        move_checks = [
+            (Direction.NORTH, "move_north"),
+            (Direction.SOUTH, "move_south"),
+            (Direction.EAST, "move_east"),
+            (Direction.WEST, "move_west")
+        ]
+
+        for direction, name in move_checks:
+            if self.can_move(unit, direction):
+                avail_action_names.append(name)
+
+        # Check Attacks
+        # Replicates distance and health checks from get_avail_agent_actions
+        shoot_range = self.unit_shoot_range(agent_id)
+
+        for t_id, t_unit in self.enemies.items():
+            if t_unit.health > 0:
+                dist = self.distance(
+                    unit.pos.x, unit.pos.y, t_unit.pos.x, t_unit.pos.y
+                )
+                if dist <= shoot_range:
+                    avail_action_names.append(f"attack_enemy_{t_id}")
+
+        # 3. Determine Reason
+        no_action_reason = ""
+
+        # If the only available action is "stop", we must provide a specific reason
+        if len(avail_action_names) == 1 and avail_action_names[0] == "stop":
+            # Identify the unit type name to provide a specific reason (e.g., "The agent is Pylon")
+            unit_type_name = "unknown unit"
+            for name, uid in self.rlunit_ids.items():
+                if uid == unit.unit_type:
+                    unit_type_name = name
+                    break
+            
+            no_action_reason = f"The agent is {unit_type_name}, action can only be 'stop'"
+
+        return avail_action_names, no_action_reason
+    
+    def map_action_name_to_one_hot(self, action_name):
+        action_idx = -1
+        
+        # Static mappings derived from get_avail_agent_actions logic
+        # 0: no-op, 1: stop, 2-5: move, 6: special ability (Depot/Nydus)
+        if action_name == "no-op":
+            action_idx = 0
+        elif action_name == "stop":
+            action_idx = 1
+        elif action_name == "move_north":
+            action_idx = 2
+        elif action_name == "move_south":
+            action_idx = 3
+        elif action_name == "move_east":
+            action_idx = 4
+        elif action_name == "move_west":
+            action_idx = 5
+        elif action_name in ["DepotLower", "DepotRaise", "NydusCanalLoad", "NydusCanalUnload"]:
+            action_idx = 6
+        elif action_name.startswith("attack_enemy_"):
+            try:
+                # Parse target ID from string and apply offset
+                t_id = int(action_name.split("_")[-1])
+                action_idx = self.n_actions_no_attack + t_id
+            except ValueError:
+                pass
+
+        # Create the one-hot vector of length n_actions
+        one_hot_vector = [0] * self.n_actions
+        if 0 <= action_idx < self.n_actions:
+            one_hot_vector[action_idx] = 1
+            
+        return one_hot_vector
+
+    
+

@@ -329,6 +329,8 @@ class LowImplementer:
     def take_actions(self, high_level_commands,llm_obs_dict):
         actions = np.ones((self.env.n_agents))  # 默认全停
 
+        # cprint(high_level_commands, "yellow")
+
         for uid, command in high_level_commands.items():
             # cprint(f"\n[LowImplementer] Processing Agent {uid} Command: {command}", "cyan")
             if uid not in llm_obs_dict['ally']:
@@ -364,6 +366,7 @@ class LowImplementer:
                                     target_x, target_y = target_enemy_unit.pos.x, target_enemy_unit.pos.y
                                     specific_action_name = self.get_next_action(uid, (target_x, target_y))
                                     
+
                                     if specific_action_name:
                                         final_action_int = self.action_name_to_int(specific_action_name)
                                     else:
@@ -386,8 +389,8 @@ class LowImplementer:
                                 # 只有存活的盟友才有位置信息
                                 if target_ally_unit.health > 0:
                                     target_x, target_y = target_ally_unit.pos.x, target_ally_unit.pos.y
-                                    specific_action_name = self.get_next_action(uid, (target_x, target_y))
-                                    
+                                    specific_action_name = self.get_next_action(uid, (target_x, target_y))                             
+
                                     if specific_action_name:
                                         final_action_int = self.action_name_to_int(specific_action_name)
                                     else:
@@ -400,7 +403,12 @@ class LowImplementer:
                                     pass
                             else:
                                 cprint(f"[Error] Target Ally ID {target_ally_id} not found in env.allies!", "red")
-                
+                    # 需要判断A*返回的动作是否在available_actions中
+                    
+                    available_actions = self.env.get_avail_agent_actions(uid)
+                    if available_actions[final_action_int] != 1:
+                        final_action_int = 1  # 强制 Stop
+
                     # else:
                     #     raise ValueError(f"Unknown high-level command format: {command}")
                 

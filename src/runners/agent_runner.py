@@ -183,7 +183,7 @@ class AgentRunner:
 
         high_action_list = []
         
-
+        
         while not terminated:
             # Get llm info from env
             
@@ -191,11 +191,13 @@ class AgentRunner:
 
         
             '''[DEBUG] 每 10 步打印一次 bait_id 和各单位到敌方 CommandCenter 的距离'''
-            if self.current_event_idx == 1 and False:
+            # if self.current_event_idx == 0:
+            #     print(llm_info_dict['ally'][3]['available_actions'])
+
                 # from termcolor import cprint
                 # cprint(f"\n[DEBUG] Visible Enemies: {list(llm_info_dict['enemy'].keys())}", "yellow")
 
-                bait_id = self.commander.bait_id
+                # bait_id = self.commander.bait_id
                 # print("Agents load by NydusNetwork",self.env.load.keys())
                 # for i, v in llm_info_dict['enemy'].items():
                 #     if v['unit_type'] == 'CommandCenter':
@@ -281,88 +283,79 @@ def execute(self, obs):
     actions = {}
     trigger_met = False
 
-    # Initialization
     if not hasattr(self, 'init_done'):
         self.init_done = True
-        
-        # Identify Nydus Network
-        nydus_list = self.get_units_by_type(obs['ally'], 'nydusNetwork')
-        self.nydus_id = nydus_list[0] if nydus_list else None
 
-        # Identify Zerglings
-        zerglings = self.get_units_by_type(obs['ally'], 'zergling')
-        
-        # Select Bait: Zergling farthest from Nydus Network
-        self.bait_id = None
-        if self.nydus_id is not None and zerglings:
-            nydus_pos = obs['ally'][self.nydus_id]['coords']
-            max_dist = -1.0
-            for z_id in zerglings:
-                dist = self.get_distance(obs['ally'][z_id]['coords'], nydus_pos)
-                if dist > max_dist:
-                    max_dist = dist
-                    self.bait_id = z_id
-        elif zerglings:
-            self.bait_id = zerglings[0]
-            
-        # Store initial health to detect if attacked
-        if self.bait_id is not None:
-            self.bait_max_health = obs['ally'][self.bait_id]['health']
-        else:
-            self.bait_max_health = 35.0
+    # Helper function for Euclidean distance
+    def get_distance(pos1, pos2):
+        return ((pos1[0] - pos2[0]) ** 2 + (pos1[1] - pos2[1]) ** 2) ** 0.5
 
-    # Check Trigger: Bait Zergling is attacked
-    if self.bait_id is not None:
-        if self.bait_id not in obs['ally']:
-            # Bait died (implies attack)
-            trigger_met = True
-        else:
-            current_health = obs['ally'][self.bait_id]['health']
-            if current_health < self.bait_max_health:
-                trigger_met = True
+    # Identify Enemy Targets
+    cc_id = 2
+    command_center = obs['enemy'].get(cc_id)
+    hellions = [u for u in obs['enemy'].values() if u['unit_type'] == 'HellionTank']
 
-    # Find target for bait (Enemy Command Center)
-    enemy_ccs = self.get_units_by_type(obs['enemy'], 'CommandCenter')
-    target_cc = enemy_ccs[0] if enemy_ccs else None
+    # Track burrowed units for Trigger logic
+    burrowed_units = []
 
-    # Assign Actions
     for uid, unit in obs['ally'].items():
         if unit['available_actions'] == ['no-op']:
             actions[uid] = 'no-op'
             continue
+        
+        unit_type = unit['unit_type']
+        available = unit['available_actions']
 
-        u_type = unit['unit_type']
-
-        # Nydus Network: Do not load units (Phase constraint)
-        if u_type == 'nydusNetwork':
+        # Handling Hatchery
+        if unit_type == 'hatchery':
             actions[uid] = 'stop'
             continue
 
-        # Bait Logic: Move toward enemy base
-        if uid == self.bait_id:
-            if target_cc is not None:
-                actions[uid] = f'navigate_to_enemy_{target_cc}'
+        # Handling ZerglingBurrowed (Waiting for enemies to leave)
+        if unit_type == 'zerglingBurrowed':
+            burrowed_units.append(unit)
+            actions[uid] = 'stop' if 'stop' in available else available[0]
+            continue
+
+        # Handling Zergling (Active)
+        if unit_type == 'zergling':
+            # Check proximity to any HellionTank
+            closest_hellion_dist = float('inf')
+            for h in hellions:
+                d = get_distance(unit['coords'], h['coords'])
+                if d < closest_hellion_dist:
+                    closest_hellion_dist = d
+            
+            # Logic: Burrow if Hellion is close (threshold ~10.0), else Move/Attack CC
+            if closest_hellion_dist < 10.0 and 'burrow_down' in available:
+                actions[uid] = 'burrow_down'
             else:
-                # If no CC, move to any enemy
-                enemies = list(obs['enemy'].keys())
-                if enemies:
-                    actions[uid] = f'navigate_to_enemy_{enemies[0]}'
+                # Attack CC if in range, otherwise move to it
+                attack_action = f"attack_enemy_{cc_id}"
+                if attack_action in available:
+                    actions[uid] = attack_action
+                elif command_center: # Only navigate if target exists
+                    actions[uid] = f"navigate_to_enemy_{cc_id}"
                 else:
                     actions[uid] = 'stop'
-            continue
 
-        # Other Mobile Units: Move toward Nydus Network
-        if u_type in ['zergling', 'roach']:
-            if self.nydus_id is not None:
-                actions[uid] = f'navigate_to_ally_{self.nydus_id}'
-            else:
-                actions[uid] = 'stop'
-            continue
+    # Trigger Logic: "After the enemy moves away"
+    # We satisfy this if we have burrowed units and the threat (Hellions) is no longer close.
+    # Using a slightly larger distance (hysteresis) to ensure safety before unburrowing.
+    if burrowed_units:
+        is_safe = True
+        for b_unit in burrowed_units:
+            for h in hellions:
+                if get_distance(b_unit['coords'], h['coords']) < 12.0:
+                    is_safe = False
+                    break
+            if not is_safe:
+                break
+        
+        if is_safe:
+            trigger_met = True
 
-        # Default (Hatchery, NydusCanal, etc.)
-        actions[uid] = 'stop'
-
-    # Safety fill
+    # Safety fill for any missed units
     for uid in obs['ally']:
         if uid not in actions:
             avail = obs['ally'][uid]['available_actions']
@@ -376,103 +369,59 @@ def execute(self, obs):
     actions = {}
     trigger_met = False
 
-    # Initialization
     if not hasattr(self, 'init_done'):
         self.init_done = True
-        
-        # Identify Nydus Network
-        nydus_list = self.get_units_by_type(obs['ally'], 'nydusNetwork')
-        self.nydus_id = nydus_list[0] if nydus_list else None
 
-        # Identify Zerglings
-        zerglings = self.get_units_by_type(obs['ally'], 'zergling')
-        
-        # Select Bait: Zergling farthest from Nydus Network
-        self.bait_id = None
-        if self.nydus_id is not None and zerglings:
-            nydus_pos = obs['ally'][self.nydus_id]['coords']
-            max_dist = -1.0
-            for z_id in zerglings:
-                dist = self.get_distance(obs['ally'][z_id]['coords'], nydus_pos)
-                if dist > max_dist:
-                    max_dist = dist
-                    self.bait_id = z_id
-        elif zerglings:
-            self.bait_id = zerglings[0]
-            
-        # Store initial health to detect if attacked (legacy from Phase 1)
-        if self.bait_id is not None and self.bait_id in obs['ally']:
-            self.bait_max_health = obs['ally'][self.bait_id]['health']
-        else:
-            self.bait_max_health = 35.0
+    # Helper function for Euclidean distance (if needed)
+    def get_distance(pos1, pos2):
+        return ((pos1[0] - pos2[0]) ** 2 + (pos1[1] - pos2[1]) ** 2) ** 0.5
 
-    # Phase 2 Logic
-    
-    # Identify loadable units (Zerglings + Roaches, excluding bait)
-    loadable_units = []
-    unit_types_to_load = ['zergling', 'roach']
-    for uid, unit in obs['ally'].items():
-        if unit['unit_type'] in unit_types_to_load:
-            if uid != self.bait_id:
-                loadable_units.append(uid)
+    cc_id = 2
+    command_center_exists = cc_id in obs['enemy']
 
-    # Check Trigger: All loadable units are loaded
-    # Loaded definition: Alive but available_actions is only ['stop']
-    unloaded_units = []
-    for uid in loadable_units:
-        avail = obs['ally'][uid]['available_actions']
-        # If unit has actions other than 'stop' (e.g. 'can_move'), it is not loaded
-        if avail != ['stop']:
-            unloaded_units.append(uid)
-            
-    if len(unloaded_units) == 0:
-        trigger_met = True
-
-    # Identify target for Bait
-    enemy_ccs = self.get_units_by_type(obs['enemy'], 'CommandCenter')
-    target_cc = enemy_ccs[0] if enemy_ccs else None
-
-    # Assign Actions
     for uid, unit in obs['ally'].items():
         if unit['available_actions'] == ['no-op']:
             actions[uid] = 'no-op'
             continue
 
-        u_type = unit['unit_type']
+        unit_type = unit['unit_type']
+        available = unit['available_actions']
 
-        # Nydus Network: Use Load ability if there are units to load
-        if u_type == 'nydusNetwork':
-            if unloaded_units and 'NydusCanalLoad' in unit['available_actions']:
-                actions[uid] = 'NydusCanalLoad'
+        # Hatchery Logic
+        if unit_type == 'hatchery':
+            actions[uid] = 'stop'
+            continue
+
+        # Burrowed Zergling Logic: Unburrow immediately to join the fight
+        if unit_type == 'zerglingBurrowed':
+            if 'burrow_up' in available:
+                actions[uid] = 'burrow_up'
             else:
                 actions[uid] = 'stop'
             continue
 
-        # Bait: Continue distracting/moving to enemy
-        if uid == self.bait_id:
-            if target_cc:
-                actions[uid] = f'navigate_to_enemy_{target_cc}'
+        # Active Zergling Logic: Advance to destroy Command Center
+        if unit_type == 'zergling':
+            # Prioritize attacking the Command Center
+            attack_cc = f"attack_enemy_{cc_id}"
+            
+            if attack_cc in available:
+                actions[uid] = attack_cc
+            elif command_center_exists and 'can_move' in available:
+                actions[uid] = f"navigate_to_enemy_{cc_id}"
             else:
-                enemies = list(obs['enemy'].keys())
-                if enemies:
-                    actions[uid] = f'navigate_to_enemy_{enemies[0]}'
+                # If CC is destroyed or unreachable, attack any other enemy
+                attack_actions = [a for a in available if a.startswith('attack_enemy_')]
+                if attack_actions:
+                    actions[uid] = attack_actions[0]
+                elif 'can_move' in available and obs['enemy']:
+                    # Move to the first available enemy if no specific target
+                    first_enemy_id = list(obs['enemy'].keys())[0]
+                    actions[uid] = f"navigate_to_enemy_{first_enemy_id}"
                 else:
                     actions[uid] = 'stop'
-            continue
 
-        # Loadable Units: Move to Nydus Network to get loaded
-        if uid in loadable_units:
-            # Only move if not already loaded (though loaded units usually only have 'stop')
-            if uid in unloaded_units and self.nydus_id is not None:
-                actions[uid] = f'navigate_to_ally_{self.nydus_id}'
-            else:
-                actions[uid] = 'stop'
-            continue
-
-        # Default (Hatchery, NydusCanal, etc.)
-        actions[uid] = 'stop'
-
-    # Safety fill
+    # Safety fill ensures every unit has an action
     for uid in obs['ally']:
         if uid not in actions:
             avail = obs['ally'][uid]['available_actions']

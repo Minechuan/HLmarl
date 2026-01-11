@@ -51,10 +51,15 @@ class SC2TacticsADCCEnv(te.SC2TacticsEnv):
     
     def get_agent_action(self, a_id, action):
         """Construct the action for agent a_id."""
+        # print(f"a_id used in get_avail_agent_actions{a_id}")
+        
         avail_actions = self.get_avail_agent_actions(a_id)
+        
+        unit = self.get_unit_by_id(a_id)
+
         assert (
             avail_actions[action] == 1
-        ), "Agent {} cannot perform action {}".format(a_id, action)
+        ), "Agent {} is {} cannot perform action".format(a_id, action)
 
         unit = self.get_unit_by_id(a_id)
         if unit == None:
@@ -279,3 +284,88 @@ class SC2TacticsADCCEnv(te.SC2TacticsEnv):
                     return False
             return True
         return False
+    
+    '''Add your own functions below'''
+    def get_agent_avail_llm_actions(self, agent_id):
+        unit = self.get_unit_by_id(agent_id)
+        
+        # 1. Handle dead or missing agents (Only no-op)
+        if unit is None or unit.health <= 0:
+            return ["no_op"], "agent is dead"
+
+        avail_actions = ["stop"]
+        
+        # 2. Handle specific unit types restricted by environment logic
+        # Re-integrating logic from get_avail_agent_actions
+        
+        # Case: Hatchery (Can only stop)
+        if unit.unit_type == self.rlunit_ids.get("hatchery"):
+            return ["stop"], "The agent is Hatchery, action can only be 'stop'"
+        
+        # Case: ZerglingBurrowed (Can stop or burrow_up)
+        if unit.unit_type == self.rlunit_ids.get("zerglingBurrowed"):
+            avail_actions.append("burrow_up")
+            return avail_actions, ""
+
+        # 3. Standard Logic (Movement, BurrowDown, Attack)
+        
+        # Check Movement availability
+        if self.can_move(unit, Direction.NORTH):
+            avail_actions.append("move_north")
+        if self.can_move(unit, Direction.SOUTH):
+            avail_actions.append("move_south")
+        if self.can_move(unit, Direction.EAST):
+            avail_actions.append("move_east")
+        if self.can_move(unit, Direction.WEST):
+            avail_actions.append("move_west")
+
+        # Check BurrowDown
+        # get_avail_agent_actions enables action 6 generally here, but get_agent_action
+        # strictly requires the unit to be a "zergling". We check type to be safe/faithful.
+        if unit.unit_type == self.rlunit_ids.get("zergling"):
+            avail_actions.append("burrow_down")
+
+        # Check Attacks
+        shoot_range = self.unit_shoot_range(agent_id)
+        for t_id, t_unit in self.enemies.items():
+            if t_unit.health > 0:
+                dist = self.distance(
+                    unit.pos.x, unit.pos.y, t_unit.pos.x, t_unit.pos.y
+                )
+                if dist <= shoot_range:
+                    avail_actions.append(f"attack_enemy_{t_id}")
+
+        # 4. Final validation for "only stop"
+        if len(avail_actions) == 1:
+            return avail_actions, "Agent cannot move or find targets in range"
+
+        return avail_actions, ""
+    
+    def map_action_name_to_one_hot(self, action_name):
+        one_hot = [0] * self.n_actions
+        static_map = {
+            "no_op": 0,
+            "stop": 1,
+            "move_north": 2,
+            "move_south": 3,
+            "move_east": 4,
+            "move_west": 5,
+            "burrow_down": 6,
+            "burrow_up": 6
+        }
+
+        if action_name in static_map:
+            idx = static_map[action_name]
+            if idx < self.n_actions:
+                one_hot[idx] = 1
+        elif action_name.startswith("attack_enemy_"):
+            try:
+                target_id = int(action_name.split("_")[-1])
+                idx = self.n_actions_no_attack + target_id
+                if idx < self.n_actions:
+                    one_hot[idx] = 1
+            except ValueError:
+                pass
+                
+        return one_hot
+

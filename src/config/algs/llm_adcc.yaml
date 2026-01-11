@@ -1,0 +1,24 @@
+
+
+save_replay: True
+
+
+
+llm_output_path: ./llm_runs_1_10_3.txt
+llm_model_name: "gemini-3-pro-preview"
+llm_api_key: "sk-ELIhvy3qDRcSwGaxCReISEQEuLxaR1sVlQe3e5FrH9Cxgpla"
+llm_url: "https://api.jisuai.top/v1"
+llm_temperature: 1.0
+
+llm_mock: False # 使用 agent runner 中最后一个函数的输出作为 llm 的输出，方便调试
+play_nepisode: 1
+
+llm_victory_condition: "Destroy the enemy Command Center."
+
+
+llm_events:
+  - strategy: "All zerglings move towards the enemy Command Center. If close to the Command Center, destroy it. If a HellionTank is close on the way, execute 'BurrowDown' to become a zerglingBurrowed."
+    trigger: "At the start of the battle."
+
+  - strategy: "All zerglings continue advancing towards the Command Center to destroy it."
+    trigger: "After the enemy moves away, execute 'BurrowUp' to revert to a Zergling"

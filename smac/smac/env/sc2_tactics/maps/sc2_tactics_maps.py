@@ -310,6 +310,10 @@ map_param_registry = {
                 "zergling": 105,
                 "zerglingBurrowed": 119,
             },
+            'enemy_unit_id_dict': {
+                'CommandCenter': 18,
+                'HellionTank': 484,
+            },
         },
     },
 
