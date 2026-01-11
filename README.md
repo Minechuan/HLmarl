@@ -59,14 +59,6 @@ The ablove only saves sacred logs, just for testing whether the environment work
 python src/main.py --config=qatten2 --env-config=sc2te with env_args.map_name=$NAME$ checkpoint_path=./checkpoints/qatten2/$NAME$ test_nepisode=32 save_replay=True runner=episode save_model=False use_tensorboard=False evaluate=True batch_size_run=1
 ```
 
-**Test MAPPO** (with checkpoint provided in ``checkpoints/mappo``):
-
-[TODO] 下面这条命令跑不通突然跑不通，需要重新试一下
-
-```bash
-python src/main.py --config=ippo --env-config=sc2te with env_args.map_name=gmzz_te use_tensorboard=False checkpoint_path=./checkpoints/mappo/gmzz_te test_nepisode=32 save_replay=True runner=episode save_model=False evaluate=True
-```
-
 **Test Agent Framework**:
 
 First check if the API worsks:

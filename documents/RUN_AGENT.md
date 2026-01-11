@@ -15,7 +15,7 @@ Manually refine the VLM output to ensure accuracy and clarity. Move the victory 
 ### 3 Human Add Enemy ID Mapping: *Necessary*
 Skip this step if `enemy_unit_id_dict` already exists in the map configuration.
 
-Identify the corresponding enemy unit type IDs by running the environment or reading the map files (run any environment and print the enemy information). Reference: `smac/smac/env/sc2_tactics/constants/5.0.13/Units.json` to check all enemy IDs and their names.
+Identify the corresponding enemy unit type IDs by running the environment or reading the map files (you can find the enemies' name in `/home/featurize/work/RL/HLmarl/smac/smac/env/sc2_tactics/star36env_{map_name}.py`, the function get_unit_by_id always contains these names). Reference: `smac/smac/env/sc2_tactics/constants/5.0.13/Units.json` to check all enemy IDs and their names.
 
 **For the corresponding environment in `smac/smac/env/sc2_tactics/maps/sc2_tactics_maps.py`, add the enemy unit type mapping `enemy_unit_id_dict`**: for example, for `dhls_te`, modify the configuration as follows:
 
